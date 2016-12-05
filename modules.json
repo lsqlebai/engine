@@ -195,5 +195,12 @@
     "entries": [
       "./extensions/dragonbones/index.js"
     ]
+  },
+
+  {
+    "name": "Custom",
+    "entries": [
+      "./extensions/custom/index.js"
+    ]
   }
 ]
