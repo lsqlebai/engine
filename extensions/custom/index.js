@@ -1,7 +1,11 @@
 
 custom = {
     getDeviceID:function () {
-        return cc.SimpleNativeClass.func();
+        if (cc.sys.os == cc.sys.OS_ANDROID) {
+            return jsb.reflection.callStaticMethod("com/cmcc/system/Param", "getMacAddress", "()Ljava/lang/String;");
+        } else {
+            return "135";
+        }
     }
 };
 
