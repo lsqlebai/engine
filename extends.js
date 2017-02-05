@@ -57,7 +57,7 @@ if (!(CC_EDITOR && Editor.isMainProcess)) {
         require('./cocos2d/actions');
         require('./external/chipmunk/chipmunk.js');
     }
-    
+
     require('./extensions/ccpool/CCNodePool.js');
     require('./extensions/ccpool/CCPool.js');
 }
@@ -67,3 +67,4 @@ if (!CC_EDITOR || !Editor.isMainProcess) {
 }
 
 require('./extensions/custom');
+require('./extensions/pay');
