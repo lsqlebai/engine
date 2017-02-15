@@ -68,3 +68,4 @@ if (!CC_EDITOR || !Editor.isMainProcess) {
 
 require('./extensions/custom');
 require('./extensions/pay');
+require('./extensions/network');

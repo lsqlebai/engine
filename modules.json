@@ -205,5 +205,11 @@
         "entries": [
             "./extensions/pay/index.js"
         ]
+    },
+	{
+        "name": "UnifySocket",
+        "entries": [
+            "./extensions/network/index.js"
+        ]
     }
 ]

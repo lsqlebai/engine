@@ -4,7 +4,8 @@ custom = {
         if (cc.sys.os == cc.sys.OS_ANDROID) {
             return jsb.reflection.callStaticMethod("com/cmcc/system/Param", "getMacAddress", "()Ljava/lang/String;");
         } else {
-            return "135";
+			return cc.SimpleNativeClass.testLog();
+            //return "135";
         }
     }
 };
