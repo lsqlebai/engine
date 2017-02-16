@@ -3,7 +3,15 @@
  */
 
 UnifySocket = cc.Class({
-    _dstIP : null, // 目标ip
+	statics :{
+		CONNECTING : 0,
+		OPEN : 1,
+		CLOSING : 2,
+		CLOSED : 3,
+	},
+	properties: {
+		
+		_dstIP : null, // 目标ip
     _dstPort : 0, // 目标port
     _proxyIP : null, // 代理ip
     _proxyPort : 0, // 代理port
@@ -13,6 +21,26 @@ UnifySocket = cc.Class({
 
     _socket : null, // socket，根据平台进行生成，如果是web平台，则使用WebSocket，否则使用AsioSocket
 
+	_readyState : 0,
+	readyState : 
+	{
+        get: function () {
+            if (cc.sys.isNative)
+			{
+				return this._readyState;
+			}
+			else
+			{
+				return this._socket.readyState;
+			}
+        },
+        set: function (value) {
+            this._readyState = value;
+        }
+    },
+	},
+	
+    
     /**
      *
      * @param dstIP
@@ -47,7 +75,7 @@ UnifySocket = cc.Class({
         }
         else // web，使用websocket
         {
-            if(this._service && !this._service.empty())
+            if(this._service && !this._service.length===0)
             {
                 this._urlWebSocket = "ws://"+this._dstIP+":"+this._dstPort+"/"+this._service;
             }
@@ -95,8 +123,13 @@ UnifySocket = cc.Class({
             {
                 if(event.errorCode===0) // 连接成功
                 {
+					self._readyState = UnifySocket.OPEN;
                     self.onopen(event);
                 }
+				else
+				{
+					self._readyState = UnifySocket.CLOSED;
+				}
 
             };
 
@@ -104,9 +137,11 @@ UnifySocket = cc.Class({
             {
                 if(event.isBySelf)
                 {
+					self._readyState = UnifySocket.CLOSED;
                     self.onclose(event);
                 }else
                 {
+					self._readyState = UnifySocket.CLOSED;
                     self.onerror(event);
                 }
             };
