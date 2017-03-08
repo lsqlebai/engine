@@ -6,6 +6,11 @@ custom = {
         } else {
 			return "135";
         }
+    },
+    installApk: function (apk) {
+        if (cc.sys.os == cc.sys.OS_ANDROID) {
+            jsb.reflection.callStaticMethod("com/iflytek/utils/common/ApkUtil", "startInstallApk", "(Ljava/lang/String;)V", apk);
+        }
     }
 };
 
