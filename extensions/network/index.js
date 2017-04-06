@@ -67,7 +67,7 @@ UnifySocket = cc.Class({
             {
                 this._socket.setProxy(this._proxyIP, this._proxyPort); // 设置代理
             }
-            this._socket.setEnableCrypt(true); // 开启加密
+            this._socket.setEnableCrypt(false); // 设置是否加密
             this._socket.asynConnect(this._dstIP, this._dstPort); // 开始连接
 
 
