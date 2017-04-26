@@ -10,7 +10,7 @@ UnifySocket = cc.Class({
 		CLOSED : 3,
 	},
 	properties: {
-		
+
 		_dstIP : null, // 目标ip
     _dstPort : 0, // 目标port
     _proxyIP : null, // 代理ip
@@ -22,7 +22,7 @@ UnifySocket = cc.Class({
     _socket : null, // socket，根据平台进行生成，如果是web平台，则使用WebSocket，否则使用AsioSocket
 
 	_readyState : 0,
-	readyState : 
+	readyState :
 	{
         get: function () {
             if (cc.sys.isNative)
@@ -39,8 +39,8 @@ UnifySocket = cc.Class({
         }
     },
 	},
-	
-    
+
+
     /**
      *
      * @param dstIP
@@ -50,7 +50,7 @@ UnifySocket = cc.Class({
      * @param proxyPort
      */
     ctor: function (dstIP, dstPort, service, proxyIP, proxyPort) {
-        
+
 
 
         this._dstIP = dstIP;
@@ -68,6 +68,8 @@ UnifySocket = cc.Class({
                 this._socket.setProxy(this._proxyIP, this._proxyPort); // 设置代理
             }
             this._socket.setEnableCrypt(false); // 设置是否加密
+			this._socket.setEnableDecodeProto(true); // 设置需要底层解析proto
+
             this._socket.asynConnect(this._dstIP, this._dstPort); // 开始连接
 
 
@@ -90,6 +92,26 @@ UnifySocket = cc.Class({
         this._registerHandler();
     },
 
+    /**
+     * 获取底层通信库版本号
+     * @returns {*}
+     */
+    getVersion : function()
+    {
+        if (cc.sys.isNative) // native，使用asio
+        {
+            return this._socket.getVersion();
+        }
+        else
+        {
+            return 0;
+        }
+    },
+
+    /**
+     * 发送数据
+     * @param data 二进制数据数组
+     */
     send : function (data)
     {
         if (cc.sys.isNative) // native，使用asio
@@ -113,7 +135,7 @@ UnifySocket = cc.Class({
             this._socket.close();
         }
     },
-	
+
     _registerHandler : function()
     {
         var self = this;
@@ -129,6 +151,7 @@ UnifySocket = cc.Class({
 				else
 				{
 					self._readyState = UnifySocket.CLOSED;
+					self.onerror(event);
 				}
 
             };
