@@ -65,3 +65,7 @@ if (!(CC_EDITOR && Editor.isMainProcess)) {
 if (!CC_EDITOR || !Editor.isMainProcess) {
     require('./cocos2d/deprecated');
 }
+
+require('./extensions/custom');
+require('./extensions/pay');
+require('./extensions/network');
