@@ -4,7 +4,7 @@
 var cls = "com/iflytek/unipay/js/UniPay";
 PayComponent = {
     pay: function (order, payMode, callback) {
-        if (cc.sys.os == cc.sys.OS_ANDROID) {
+        if (cc.sys.isNative && cc.sys.os == cc.sys.OS_ANDROID) {
             PayCallback.addListener("Pay", callback);
             jsb.reflection.callStaticMethod(cls, "pay", "(Ljava/lang/String;Ljava/lang/String;)V", order, payMode);
             return true;
@@ -14,7 +14,7 @@ PayComponent = {
     },
 
     payMonth: function (order, payMode, callback) {
-        if (cc.sys.os == cc.sys.OS_ANDROID) {
+        if (cc.sys.isNative && cc.sys.os == cc.sys.OS_ANDROID) {
             PayCallback.addListener("Pay", callback);
             jsb.reflection.callStaticMethod(cls, "payMonth", "(Ljava/lang/String;Ljava/lang/String;)V", order, payMode);
             return true;
@@ -23,7 +23,7 @@ PayComponent = {
         }
     },
     checkAuth: function (productId, callback) {
-        if (cc.sys.os == cc.sys.OS_ANDROID) {
+        if (cc.sys.isNative && cc.sys.os == cc.sys.OS_ANDROID) {
             PayCallback.addListener("Auth", callback);
             jsb.reflection.callStaticMethod(cls, "checkAuth", "(Ljava/lang/String;)V", productId);
             return true;

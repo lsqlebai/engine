@@ -60,6 +60,8 @@ if (!(CC_EDITOR && Editor.isMainProcess)) {
     
     require('./extensions/ccpool/CCNodePool.js');
     require('./extensions/ccpool/CCPool.js');
+	
+	require('./extensions/network');
 }
 
 if (!CC_EDITOR || !Editor.isMainProcess) {
@@ -68,4 +70,6 @@ if (!CC_EDITOR || !Editor.isMainProcess) {
 
 require('./extensions/custom');
 require('./extensions/pay');
-require('./extensions/network');
+
+
+

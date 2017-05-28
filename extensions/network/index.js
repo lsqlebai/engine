@@ -3,6 +3,9 @@
  */
 
 UnifySocket = cc.Class({
+	
+    extends: cc.Class,
+	
 	statics :{
 		CONNECTING : 0,
 		OPEN : 1,
@@ -11,7 +14,7 @@ UnifySocket = cc.Class({
 	},
 	properties: {
 
-		_dstIP : null, // 目标ip
+	_dstIP : null, // 目标ip
     _dstPort : 0, // 目标port
     _proxyIP : null, // 代理ip
     _proxyPort : 0, // 代理port
@@ -204,3 +207,4 @@ onclose :function(event) {},
 });
 
 module.exports = UnifySocket;
+ 
