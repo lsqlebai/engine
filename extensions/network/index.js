@@ -24,11 +24,12 @@ UnifySocket = cc.Class({
 
     _socket : null, // socket，根据平台进行生成，如果是web平台，则使用WebSocket，否则使用AsioSocket
 
+	_useAsio : false,
 	_readyState : 0,
 	readyState :
 	{
         get: function () {
-            if (cc.sys.isNative)
+            if (this._useAsio)
 			{
 				return this._readyState;
 			}
@@ -62,7 +63,15 @@ UnifySocket = cc.Class({
         this._proxyIP = proxyIP;
         this._proxyPort = proxyPort;
 
-        if (cc.sys.isNative) // native，使用asio
+		if(cc.sys.isNative)
+		{
+			this._useAsio = true;
+		} else{
+			this._useAsio = false;
+		}
+		
+		
+        if (this._useAsio) // native，使用asio
         {
             this._socket = new AsioConnection(); // 创建asio socket
 
@@ -101,7 +110,7 @@ UnifySocket = cc.Class({
      */
     getVersion : function()
     {
-        if (cc.sys.isNative) // native，使用asio
+        if (this._useAsio) // native，使用asio
         {
             return this._socket.getVersion();
         }
@@ -117,7 +126,7 @@ UnifySocket = cc.Class({
      */
     send : function (data)
     {
-        if (cc.sys.isNative) // native，使用asio
+        if (this._useAsio) // native，使用asio
         {
             this._socket.asynSend(data, -1);
 
@@ -129,7 +138,7 @@ UnifySocket = cc.Class({
 
 	close : function ()
     {
-        if (cc.sys.isNative) // native，使用asio
+        if (this._useAsio) // native，使用asio
         {
             this._socket.disconnect();
 
@@ -142,7 +151,7 @@ UnifySocket = cc.Class({
     _registerHandler : function()
     {
         var self = this;
-        if (cc.sys.isNative)
+        if (this._useAsio)
         {
             this._socket.onConnectResult = function(event)
             {
