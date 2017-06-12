@@ -30,6 +30,15 @@ PayComponent = {
         } else {
             return false;
         }
+    },
+    getInitMap: function (callback) {
+        if (cc.sys.os == cc.sys.OS_ANDROID) {
+            PayCallback.addListener("Init", callback);
+            jsb.reflection.callStaticMethod(cls, "getInitMap", "()V");
+            return true;
+        } else {
+            return false;
+        }
     }
 };
 
@@ -45,6 +54,9 @@ if (cc.sys.os == cc.sys.OS_ANDROID) {
                 case "Auth":
                     this.authListeners.push(listener);
                     break;
+                case "Init":
+                    this.initListener = listener;
+                    break;
             }
         },
 
@@ -59,10 +71,16 @@ if (cc.sys.os == cc.sys.OS_ANDROID) {
                 this.authListeners[i](result);
             }
             this.authListeners.splice(0, this.authListeners.length);
+        },
+        onInit: function (result) {
+            if ( this.initListener != undefined || this.initListener != null) {
+                this.initListener(result);
+            }
         }
     };
     cc.PayListener.addListener("Pay", PayCallback, "onPay");
     cc.PayListener.addListener("Auth", PayCallback, "onAuth");
+    cc.PayListener.addListener("Init", PayCallback, "onInit");
 }
 
 
