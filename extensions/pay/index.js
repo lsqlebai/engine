@@ -37,6 +37,11 @@ PayComponent = {
             jsb.reflection.callStaticMethod(cls, "getInitMap", "()V");
             return true;
         } else {
+			
+			if(callback)
+			{
+				callback("{\"initStatus\":\"success\"}");
+			}
             return false;
         }
     }
