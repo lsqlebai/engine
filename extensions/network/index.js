@@ -81,6 +81,7 @@ UnifySocket = cc.Class({
             }
             this._socket.setEnableCrypt(false); // 设置是否加密
 			this._socket.setEnableDecodeProto(true); // 设置需要底层解析proto
+			this._socket.setEnableZlib(true); // 设置需要底层开启zlib进行数据压缩解压
 
             this._socket.asynConnect(this._dstIP, this._dstPort); // 开始连接
 
