@@ -1,7 +1,6 @@
 /**
  * Created by sulei on 2017/2/15.
  */
-
 UnifySocket = cc.Class({
 	
     extends: cc.Class,
