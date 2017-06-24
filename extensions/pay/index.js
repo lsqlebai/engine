@@ -32,7 +32,7 @@ PayComponent = {
         }
     },
     getInitMap: function (callback) {
-        if (cc.sys.os == cc.sys.OS_ANDROID) {
+        if (cc.sys.isNative && cc.sys.os == cc.sys.OS_ANDROID) {
             PayCallback.addListener("Init", callback);
             jsb.reflection.callStaticMethod(cls, "getInitMap", "()V");
             return true;
