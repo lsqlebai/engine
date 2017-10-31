@@ -67,7 +67,7 @@ cc.Scheduler.prototype.schedule = function (callback, target, interval, repeat, 
     }
     delay = delay || 0;
     var instanceId = target.__instanceId || target.uuid;
-    cc.assertID(!isNaN(instanceId), 1510);
+    cc.assertID(instanceId !== undefined, 1510);
     if (!callback.__callbackId) {
         callback.__callbackId = _callbackId++;
     }
@@ -82,10 +82,30 @@ cc.Scheduler.prototype.unschedule = function (callback, target) {
         target = callback;
         callback = tmp;
     }
+    if (callback.__callbackId === undefined) {
+        return;
+    }
+
     var instanceId = target.__instanceId || target.uuid;
-    cc.assertID(!isNaN(instanceId) && !isNaN(callback.__callbackId), 1510);
+    cc.assertID(instanceId !== undefined, 1510);
     var key = instanceId + '_' + callback.__callbackId;
     this._unschedule(key, target);
+};
+cc.Scheduler.prototype._isScheduled = cc.Scheduler.prototype.isScheduled;
+cc.Scheduler.prototype.isScheduled = function (callback, target) {
+    if (typeof target === 'function') {
+        var tmp = target;
+        target = callback;
+        callback = tmp;
+    }
+    if (callback.__callbackId === undefined) {
+        return;
+    }
+
+    var instanceId = target.__instanceId || target.uuid;
+    cc.assertID(instanceId !== undefined, 1510);
+    var key = instanceId + '_' + callback.__callbackId;
+    this._isScheduled(key, target);
 };
 
 // Node
