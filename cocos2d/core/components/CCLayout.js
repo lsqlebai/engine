@@ -196,8 +196,8 @@ var Layout = cc.Class({
                 }
                 this._doLayoutDirty();
             },
+            tooltip: CC_DEV && 'i18n:COMPONENT.layout.layout_type',
             animatable: false,
-            tooltip: CC_DEV && 'i18n:COMPONENT.layout.layout_type'
         },
 
 
@@ -212,6 +212,7 @@ var Layout = cc.Class({
         resizeMode: {
             type: ResizeMode,
             tooltip: CC_DEV && 'i18n:COMPONENT.layout.resize_mode',
+            animatable: false,
             get: function() {
                 return this._resize;
             },
@@ -229,7 +230,6 @@ var Layout = cc.Class({
                 }
                 this._doLayoutDirty();
             },
-            animatable: false
         },
 
         /**
@@ -245,7 +245,6 @@ var Layout = cc.Class({
             notify: function() {
                 this._doLayoutDirty();
             },
-            animatable: false
         },
 
         /**
@@ -285,7 +284,6 @@ var Layout = cc.Class({
             notify: function () {
                 this._doLayoutDirty();
             },
-            animatable: false
         },
 
         /**
@@ -299,7 +297,6 @@ var Layout = cc.Class({
             notify: function () {
                 this._doLayoutDirty();
             },
-            animatable: false
         },
 
         /**
@@ -313,7 +310,6 @@ var Layout = cc.Class({
             notify: function () {
                 this._doLayoutDirty();
             },
-            animatable: false
         },
 
         /**
@@ -327,7 +323,6 @@ var Layout = cc.Class({
             notify: function () {
                 this._doLayoutDirty();
             },
-            animatable: false
         },
 
         /**
@@ -340,7 +335,6 @@ var Layout = cc.Class({
             notify: function() {
                 this._doLayoutDirty();
             },
-            animatable: false,
             tooltip: CC_DEV && 'i18n:COMPONENT.layout.space_x'
         },
 
@@ -354,7 +348,6 @@ var Layout = cc.Class({
             notify: function() {
                 this._doLayoutDirty();
             },
-            animatable: false,
             tooltip: CC_DEV && 'i18n:COMPONENT.layout.space_y'
         },
 
@@ -371,8 +364,8 @@ var Layout = cc.Class({
             notify: function() {
                 this._doLayoutDirty();
             },
-            animatable: false,
-            tooltip: CC_DEV && 'i18n:COMPONENT.layout.vertical_direction'
+            tooltip: CC_DEV && 'i18n:COMPONENT.layout.vertical_direction',
+            animatable: false
         },
 
         /**
@@ -388,8 +381,8 @@ var Layout = cc.Class({
             notify: function() {
                 this._doLayoutDirty();
             },
-            animatable: false,
-            tooltip: CC_DEV && 'i18n:COMPONENT.layout.horizontal_direction'
+            tooltip: CC_DEV && 'i18n:COMPONENT.layout.horizontal_direction',
+            animatable: false
         },
     },
 
@@ -409,7 +402,9 @@ var Layout = cc.Class({
         this._N$padding = 0;
     },
 
-    __preload: function() {
+    onEnable: function() {
+        this._addEventListeners();
+
         if(cc.sizeEqualToSize(this.node.getContentSize(), cc.size(0, 0))) {
             this.node.setContentSize(this._layoutSize);
         }
@@ -418,27 +413,54 @@ var Layout = cc.Class({
             this._migratePaddingData();
         }
 
-        this.node.on('size-changed', this._resized, this);
+        this._doLayoutDirty();
+    },
 
+    onDisable: function () {
+        this._removeEventListeners();
+    },
+
+    _doLayoutDirty : function () {
+        this._layoutDirty = true;
+    },
+
+    _addEventListeners: function () {
+        cc.director.on(cc.Director.EVENT_BEFORE_VISIT, this._updateLayout, this);
+        this.node.on('size-changed', this._resized, this);
         this.node.on('anchor-changed', this._doLayoutDirty, this);
         this.node.on('child-added', this._childAdded, this);
         this.node.on('child-removed', this._childRemoved, this);
         this.node.on('child-reorder', this._doLayoutDirty, this);
-
-        this._updateChildrenEventListener();
+        this._addChildrenEventListeners();
     },
 
-    _doLayoutDirty : function() {
-        this._layoutDirty = true;
+    _removeEventListeners: function () {
+        cc.director.off(cc.Director.EVENT_BEFORE_VISIT, this._updateLayout, this);
+        this.node.off('size-changed', this._resized, this);
+        this.node.off('anchor-changed', this._doLayoutDirty, this);
+        this.node.off('child-added', this._childAdded, this);
+        this.node.off('child-removed', this._childRemoved, this);
+        this.node.off('child-reorder', this._doLayoutDirty, this);
+        this._removeChildrenEventListeners();
     },
 
-    _updateChildrenEventListener: function() {
+    _addChildrenEventListeners: function() {
         var children = this.node.children;
-        children.forEach(function(child) {
+        children.forEach(function (child) {
             child.on('size-changed', this._doLayoutDirty, this);
             child.on('position-changed', this._doLayoutDirty, this);
             child.on('anchor-changed', this._doLayoutDirty, this);
             child.on('active-in-hierarchy-changed', this._doLayoutDirty, this);
+        }.bind(this));
+    },
+
+    _removeChildrenEventListeners: function () {
+        var children = this.node.children;
+        children.forEach(function (child) {
+            child.off('size-changed', this._doLayoutDirty, this);
+            child.off('position-changed', this._doLayoutDirty, this);
+            child.off('anchor-changed', this._doLayoutDirty, this);
+            child.off('active-in-hierarchy-changed', this._doLayoutDirty, this);
         }.bind(this));
     },
 
@@ -899,14 +921,6 @@ var Layout = cc.Class({
         else if(this.type === Type.GRID) {
             this._doLayoutGrid();
         }
-    },
-
-    onEnable: function () {
-        cc.director.on(cc.Director.EVENT_BEFORE_VISIT, this._updateLayout, this);
-    },
-
-    onDisable: function () {
-        cc.director.off(cc.Director.EVENT_BEFORE_VISIT, this._updateLayout, this);
     },
 
     _updateLayout: function() {

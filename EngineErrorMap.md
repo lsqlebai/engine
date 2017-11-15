@@ -76,6 +76,10 @@ cc.GridAction.getGrid(): it should be overridden in subclass.
 
 Grid size must be (1,1)
 
+### 1019
+
+Failed to construct, Sequence construction needs two or more actions.
+
 ### 1100
 
 Expected 'data' dict, but not found. Config file: %s
@@ -1288,14 +1292,6 @@ can not found the %s page.
 
 Invalid RichText img tag! The sprite frame name can't be found in the ImageAtlas!
 
-### 4500
-
-Toggle alreay in ToggleGroup. Something bad happened, please report this issue to the Creator developer, thanks.
-
-### 4501
-
-Toggle is not in ToggleGroup. Something bad happened, please report this issue to the Creator developer, thanks.
-
 ### 4600
 
 Script attached to '%s' is missing or invalid.
@@ -1307,10 +1303,6 @@ The dom control is not created!
 ### 4800
 
 unknown asset type
-
-### 4900
-
-Sorry, the 'resources://' protocol is obsoleted, use cc.loader.loadRes instead please.
 
 ### 4901
 

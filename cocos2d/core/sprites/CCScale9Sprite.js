@@ -22,7 +22,11 @@
  THE SOFTWARE.
  ****************************************************************************/
 
-var EventTarget = require("../cocos2d/core/event/event-target");
+var EventTarget = require("../event/event-target");
+
+function sortIndex (a, b) {
+    return a - b;
+};
 
 var dataPool = {
     _pool: {},
@@ -32,7 +36,7 @@ var dataPool = {
         if (!this._pool[length]) {
             this._pool[length] = [data];
             this._lengths.push(length);
-            this._lengths.sort();
+            this._lengths.sort(sortIndex);
         }
         else {
             this._pool[length].push(data);
@@ -55,7 +59,7 @@ var dataPool = {
     }
 };
 
-var FIX_ARTIFACTS_BY_STRECHING_TEXEL = cc.macro.FIX_ARTIFACTS_BY_STRECHING_TEXEL,
+var macro = cc.macro,
     webgl,
     vl, vb, vt, vr,
     cornerId = [];
@@ -166,7 +170,7 @@ var simpleQuadGenerator = {
 
         //uv computation should take spritesheet into account.
         var l, b, r, t;
-        var texelCorrect = FIX_ARTIFACTS_BY_STRECHING_TEXEL ? 0.5 : 0;
+        var texelCorrect = macro.FIX_ARTIFACTS_BY_STRECHING_TEXEL ? 0.5 : 0;
 
         if (spriteFrame._rotated) {
             l = (textureRect.x + texelCorrect) / atlasWidth;
@@ -214,8 +218,8 @@ var scale9QuadGenerator = {
         var sizableHeight = preferSize.height - topHeight - bottomHeight;
         var xScale = preferSize.width / (leftWidth + rightWidth);
         var yScale = preferSize.height / (topHeight + bottomHeight);
-        xScale = xScale > 1 ? 1 : xScale;
-        yScale = yScale > 1 ? 1 : yScale;
+        xScale = (isNaN(xScale) || xScale > 1) ? 1 : xScale;
+        yScale = (isNaN(yScale) || yScale > 1) ? 1 : yScale;
         sizableWidth = sizableWidth < 0 ? 0 : sizableWidth;
         sizableHeight = sizableHeight < 0 ? 0 : sizableHeight;
         var x = this.x;
@@ -292,7 +296,7 @@ var scale9QuadGenerator = {
         //uv computation should take spritesheet into account.
         var u = this.x;
         var v = this.y;
-        var texelCorrect = FIX_ARTIFACTS_BY_STRECHING_TEXEL ? 0.5 : 0;
+        var texelCorrect = macro.FIX_ARTIFACTS_BY_STRECHING_TEXEL ? 0.5 : 0;
         var offset = 0, row, col;
 
         if (spriteFrame._rotated) {
@@ -348,7 +352,7 @@ var tiledQuadGenerator = {
 
         //uv computation should take spritesheet into account.
         var u0, v0, u1, v1;
-        var texelCorrect = FIX_ARTIFACTS_BY_STRECHING_TEXEL ? 0.5 : 0;
+        var texelCorrect = macro.FIX_ARTIFACTS_BY_STRECHING_TEXEL ? 0.5 : 0;
         if (spriteFrame._rotated) {
             u0 = (textureRect.x + texelCorrect) / atlasWidth;
             u1 = (textureRect.x + textureRect.height - texelCorrect) / atlasWidth;
@@ -465,7 +469,7 @@ var fillQuadGeneratorBar = {
         var textureRect = spriteFrame._rect;
         //uv computation should take spritesheet into account.
         var ul, vb, ur, vt;
-        var texelCorrect = FIX_ARTIFACTS_BY_STRECHING_TEXEL ? 0.5 : 0;
+        var texelCorrect = macro.FIX_ARTIFACTS_BY_STRECHING_TEXEL ? 0.5 : 0;
         if (spriteFrame._rotated) {
             ul = (textureRect.x + texelCorrect) / atlasWidth;
             vb = (textureRect.y + textureRect.width - texelCorrect) / atlasHeight;
@@ -906,7 +910,7 @@ var fillQuadGeneratorRadial = {
 
         //uv computation should take spritesheet into account.
         var u0, u3, v0, v3;
-        var texelCorrect = FIX_ARTIFACTS_BY_STRECHING_TEXEL ? 0.5 : 0;
+        var texelCorrect = macro.FIX_ARTIFACTS_BY_STRECHING_TEXEL ? 0.5 : 0;
 
         if (spriteFrame._rotated) {
             u0 = (textureRect.x + texelCorrect) / atlasWidth;
@@ -1050,10 +1054,6 @@ cc.Scale9Sprite = _ccsg.Node.extend({
 
         if (webgl === undefined) {
             webgl = cc._renderType === cc.game.RENDER_TYPE_WEBGL;
-            vl = cc.visibleRect.left;
-            vr = cc.visibleRect.right;
-            vt = cc.visibleRect.top;
-            vb = cc.visibleRect.bottom;
         }
     },
 
@@ -1407,6 +1407,16 @@ cc.Scale9Sprite = _ccsg.Node.extend({
             return;
         }
 
+        var rect = cc.visibleRect;
+        if (webgl && this._renderCmd._cameraFlag > 0) {
+            rect = cc.Camera.main.visibleRect;
+        }
+
+        vl = rect.left.x;
+        vr = rect.right.x;
+        vt = rect.top.y;
+        vb = rect.bottom.y;
+
         // Culling
         if (webgl) {
             // x1, y1  leftBottom
@@ -1416,10 +1426,10 @@ cc.Scale9Sprite = _ccsg.Node.extend({
             var vert = this._isTriangle ? this._rawVerts : this._vertices,
                 x0 = vert[cornerId[0]], x1 = vert[cornerId[1]], x2 = vert[cornerId[2]], x3 = vert[cornerId[3]],
                 y0 = vert[cornerId[0] + 1], y1 = vert[cornerId[1] + 1], y2 = vert[cornerId[2] + 1], y3 = vert[cornerId[3] + 1];
-            if (((x0-vl.x) & (x1-vl.x) & (x2-vl.x) & (x3-vl.x)) >> 31 || // All outside left
-                ((vr.x-x0) & (vr.x-x1) & (vr.x-x2) & (vr.x-x3)) >> 31 || // All outside right
-                ((y0-vb.y) & (y1-vb.y) & (y2-vb.y) & (y3-vb.y)) >> 31 || // All outside bottom
-                ((vt.y-y0) & (vt.y-y1) & (vt.y-y2) & (vt.y-y3)) >> 31)   // All outside top
+            if (((x0-vl) & (x1-vl) & (x2-vl) & (x3-vl)) >> 31 || // All outside left
+                ((vr-x0) & (vr-x1) & (vr-x2) & (vr-x3)) >> 31 || // All outside right
+                ((y0-vb) & (y1-vb) & (y2-vb) & (y3-vb)) >> 31 || // All outside bottom
+                ((vt-y0) & (vt-y1) & (vt-y2) & (vt-y3)) >> 31)   // All outside top
             {
                 this._renderCmd._needDraw = false;
             }
@@ -1430,7 +1440,7 @@ cc.Scale9Sprite = _ccsg.Node.extend({
         else {
             var bb = this._renderCmd._currentRegion,
                 l = bb._minX, r = bb._maxX, b = bb._minY, t = bb._maxY;
-            if (r < vl.x || l > vr.x || t < vb.y || b > vt.y) {
+            if (r < vl || l > vr || t < vb || b > vt) {
                 this._renderCmd._needDraw = false;
             }
             else {

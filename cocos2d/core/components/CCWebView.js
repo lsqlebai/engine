@@ -20,7 +20,7 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  ****************************************************************************/
-
+require('../webview/CCSGWebView');
 /**
  * !#en WebView event type
  * !#zh 网页视图事件类型
@@ -120,12 +120,15 @@ var WebView = cc.Class({
         var sgNode = this._sgNode;
         if (!sgNode) return;
 
-        if(!CC_JSB) {
+        if (!CC_JSB) {
             sgNode.createDomElementIfNeeded();
         }
-        sgNode.setEventListener(EventType.LOADED , this._onWebViewLoaded.bind(this));
-        sgNode.setEventListener(EventType.LOADING , this._onWebViewLoading.bind(this));
-        sgNode.setEventListener(EventType.ERROR , this._onWebViewLoadError.bind(this));
+
+        if (!CC_EDITOR) {
+            sgNode.setEventListener(EventType.LOADED, this._onWebViewLoaded.bind(this));
+            sgNode.setEventListener(EventType.LOADING, this._onWebViewLoading.bind(this));
+            sgNode.setEventListener(EventType.ERROR, this._onWebViewLoadError.bind(this));
+        }
 
         sgNode.loadURL(this._url);
 
@@ -151,6 +154,37 @@ var WebView = cc.Class({
     _onWebViewLoadError: function () {
         cc.Component.EventHandler.emitEvents(this.webviewEvents, this, EventType.ERROR);
         this.node.emit('error', this);
+    },
+
+    /**
+     * !#en
+     * Set javascript interface scheme.
+     * Note: only available on Android and iOS at the moment.
+     * !#zh
+     * 设置 javascript 接口方案。
+     * 注意：目前只能在 Android 和 iOS 上使用。
+     * @method setJavascriptInterfaceScheme
+     * @param {String} scheme
+     */
+    setJavascriptInterfaceScheme: function (scheme) {
+        if (this._sgNode) {
+            this._sgNode.setJavascriptInterfaceScheme(scheme);
+        }
+    },
+    /**
+     * !#en
+     * This callback called when load URL that start with javascript interface scheme.
+     * Note: only available on Android and iOS at the moment.
+     * !#zh
+     * 当加载 URL 以 JavaScript 接口方案开始时调用这个回调函数。
+     * 注意：目前只能在 Android 和 iOS 上使用。
+     * @method setOnJSCallback
+     * @param {Function} callback
+     */
+    setOnJSCallback: function (callback) {
+        if (this._sgNode) {
+            this._sgNode.setOnJSCallback(callback);
+        }
     }
 
 });
@@ -162,7 +196,7 @@ cc.WebView = module.exports = WebView;
  * !#zh
  * 注意：此事件是从该组件所属的 Node 上面派发出来的，需要用 node.on 来监听。
  * @event loaded
- * @param {Event} event
+ * @param {Event.EventCustom} event
  * @param {WebView} event.detail - The WebView component.
  */
 
@@ -172,7 +206,7 @@ cc.WebView = module.exports = WebView;
  * !#zh
  * 注意：此事件是从该组件所属的 Node 上面派发出来的，需要用 node.on 来监听。
  * @event loading
- * @param {Event} event
+ * @param {Event.EventCustom} event
  * @param {WebView} event.detail - The WebView component.
  */
 
@@ -182,6 +216,20 @@ cc.WebView = module.exports = WebView;
  * !#zh
  * 注意：此事件是从该组件所属的 Node 上面派发出来的，需要用 node.on 来监听。
  * @event error
- * @param {Event} event
+ * @param {Event.EventCustom} event
  * @param {WebView} event.detail - The WebView component.
+ */
+
+/**
+ * !#en if you don't need the WebView and it isn't in any running Scene, you should
+ * call the destroy method on this component or the associated node explicitly.
+ * Otherwise, the created DOM element won't be removed from web page.
+ * !#zh
+ * 如果你不再使用 WebView，并且组件未添加到场景中，那么你必须手动对组件或所在节点调用 destroy。
+ * 这样才能移除网页上的 DOM 节点，避免 Web 平台内存泄露。
+ * @example
+ * webview.node.parent = null;  // or  webview.node.removeFromParent(false);
+ * // when you don't need webview anymore
+ * webview.node.destroy();
+ * @method destroy
  */

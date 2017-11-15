@@ -26,8 +26,6 @@
 
 require('./_CCClass');
 
-cc._tmp = cc._tmp || {};
-
 /**
  * !#en Key map for keyboard event
  * !#zh 键盘事件的按键值
@@ -1141,7 +1139,7 @@ cc.getImageFormatByData = function (imgData) {
 
 /**
  * Predefined constants
- * @enum Macro
+ * @enum macro
  * @type {Object}
  */
 cc.macro = {
@@ -1659,7 +1657,7 @@ cc.macro = {
      *
      * @property {Number} FIX_ARTIFACTS_BY_STRECHING_TEXEL
      */
-    FIX_ARTIFACTS_BY_STRECHING_TEXEL: 1,
+    FIX_ARTIFACTS_BY_STRECHING_TEXEL: 0,
 
     /**
      * Position of the FPS (Default: 0,0 (bottom-left corner))<br/>
@@ -1885,15 +1883,49 @@ cc.macro = {
      * 它的值被 native 宏 CC_ENABLE_GC_FOR_NATIVE_OBJECTS 所控制，修改 JS 宏的值不会产生任何效果。
      * @property {Number} ENABLE_GC_FOR_NATIVE_OBJECTS
      */
-    ENABLE_GC_FOR_NATIVE_OBJECTS: true
+    ENABLE_GC_FOR_NATIVE_OBJECTS: true,
+
+    /**
+     * !#en 
+     * Whether or not enabled tiled map auto culling.
+     * !#zh
+     * 是否开启瓦片地图的自动裁减功能。
+     * @property {Boolean} ENABLE_TILEDMAP_CULLING
+     * @default true
+     */
+    ENABLE_TILEDMAP_CULLING: true,
+
+    /**
+     * !#en 
+     * The max concurrent task number for the downloader
+     * !#zh
+     * 下载任务的最大并发数限制，在安卓平台部分机型或版本上可能需要限制在较低的水平
+     * @property {Number} DOWNLOAD_MAX_CONCURRENT
+     * @default 64
+     */
+    DOWNLOAD_MAX_CONCURRENT: 64,
+
+    /**
+     * !#en 
+     * Boolean that indicates if the canvas contains an alpha channel, default sets to false for better performance.
+     * Though if you want to make your canvas background transparent and show other dom elements at the background, 
+     * you can set it to true before `cc.game.run`.
+     * Web only.
+     * !#zh
+     * 用于设置 Canvas 背景是否支持 alpha 通道，默认为 false，这样可以有更高的性能表现。
+     * 如果你希望 Canvas 背景是透明的，并显示背后的其他 DOM 元素，你可以在 `cc.game.run` 之前将这个值设为 true。
+     * 仅支持 Web
+     * @property {Boolean} ENABLE_TRANSPARENT_CANVAS
+     * @default false
+     */
+    ENABLE_TRANSPARENT_CANVAS: false,
 };
 
 /**
- * @module cc
- */
-
-/**
+ * !#en
  * default gl blend src function. Compatible with premultiplied alpha images.
+ * !#zh
+ * 默认的混合源模式
  * @property BLEND_SRC
  * @type {Number}
  */
@@ -1906,6 +1938,10 @@ cc.defineGetterSetter(cc.macro, "BLEND_SRC", function (){
         return cc.macro.SRC_ALPHA;
     }
 });
+
+/**
+ * @module cc
+ */
 
 /**
  * <p>
@@ -2035,7 +2071,7 @@ cc.incrementGLDraws = function (addNumber) {
  * @method checkGLErrorDebug
  */
 cc.checkGLErrorDebug = function () {
-    if (cc.renderMode === cc.game.RENDER_TYPE_WEBGL) {
+    if (cc._renderType === cc.game.RENDER_TYPE_WEBGL) {
         var _error = cc._renderContext.getError();
         if (_error) {
             cc.logID(2400, _error);

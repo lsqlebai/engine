@@ -22,8 +22,8 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  ****************************************************************************/
-require('../label/CCHtmlTextParser.js');
-require('../label/CCTextUtils.js');
+require('../label/CCHtmlTextParser');
+require('../label/CCTextUtils');
 
 var HorizontalAlign = cc.TextAlignment;
 var VerticalAlign = cc.VerticalTextAlignment;
@@ -35,30 +35,16 @@ var VerticalAlign = cc.VerticalTextAlignment;
 // leading edge, instead of the trailing.
 function debounce (func, wait, immediate) {
     var timeout;
-    return CC_JSB ? function (...args) {
+    return function () {
         var context = this;
         var later = function() {
             timeout = null;
-            if (!immediate) func.apply(context, args);
+            if (!immediate) func.apply(context, arguments);
         };
         var callNow = immediate && !timeout;
         clearTimeout(timeout);
         timeout = setTimeout(later, wait);
-        if (callNow) func.apply(context, args);
-    } : function () {
-        var context = this;
-        var args = new Array(arguments.length);
-        for (var i = 0; i < arguments.length; i++) {
-            args[i] = arguments[i];
-        }
-        var later = function() {
-            timeout = null;
-            if (!immediate) func.apply(context, args);
-        };
-        var callNow = immediate && !timeout;
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-        if (callNow) func.apply(context, args);
+        if (callNow) func.apply(context, arguments);
     };
 }
 
@@ -74,7 +60,9 @@ var RichText = cc.Class({
 
     ctor: function() {
         this._textArray = null;
+        this._labelSegments = [];
         this._labelSegmentsCache = [];
+        this._linesWidth = [];
 
         this._resetState();
 
@@ -215,12 +203,14 @@ var RichText = cc.Class({
         VerticalAlign: VerticalAlign
     },
 
-    __preload: function () {
+    onEnable: function () {
         this._super();
+        this.node.on(cc.Node.EventType.TOUCH_END, this._onTouchEnded, this);
+    },
 
-        if (!CC_EDITOR) {
-            this._registerEvents();
-        }
+    onDisable: function () {
+        this._super();
+        this.node.off(cc.Node.EventType.TOUCH_END, this._onTouchEnded, this);
     },
 
     _createSgNode: function () {
@@ -252,7 +242,7 @@ var RichText = cc.Class({
     },
 
     _createFontLabel: function (string) {
-        return  new _ccsg.Label(string, this._getFontRawUrl());
+        return  _ccsg.Label.pool.get(string, this.font, null, this.fontSize);
     },
 
     _getFontRawUrl: function() {
@@ -323,19 +313,15 @@ var RichText = cc.Class({
         return cc.rectContainsPoint(myRect, point);
     },
 
-    _registerEvents: function () {
-        this.node.on(cc.Node.EventType.TOUCH_END, this._onTouchEnded, this);
-    },
-
     _resetState: function () {
         var sgNode = this._sgNode;
         if(sgNode) {
             sgNode.removeAllChildren();
         }
 
-        this._labelSegments = [];
-        this._labelSegmentsCache = [];
-        this._linesWidth = [];
+        this._labelSegments.length = 0;
+        this._labelSegmentsCache.length = 0;
+        this._linesWidth.length = 0;
         this._lineOffsetX = 0;
         this._lineCount = 1;
         this._labelWidth = 0;
@@ -356,7 +342,7 @@ var RichText = cc.Class({
 
         this._applyTextAttribute(labelSegment);
 
-        labelSegment.setAnchorPoint(cc.p(0, 0));
+        labelSegment.setAnchorPoint(0, 0);
         this._sgNode.addChild(labelSegment);
         this._labelSegments.push(labelSegment);
 
@@ -429,7 +415,6 @@ var RichText = cc.Class({
 
             this._addLabelSegment(labelString, styleIndex);
         }
-
     },
 
     _isLastComponentCR: function(stringToken) {
@@ -513,31 +498,45 @@ var RichText = cc.Class({
         var spriteFrame = this.imageAtlas.getSpriteFrame(spriteFrameName);
         if(spriteFrame) {
             var sprite = new cc.Scale9Sprite();
-            sprite.setAnchorPoint(cc.p(0, 0));
+            sprite.setAnchorPoint(0, 0);
             spriteFrame.__sprite = sprite;
             this._sgNode.addChild(sprite);
             this._labelSegments.push(sprite);
 
             var spriteRect = spriteFrame.getRect();
             var scaleFactor = 1;
-            if(spriteRect.height > this.lineHeight) {
-                scaleFactor = this.lineHeight / spriteRect.height;
+            var spriteWidth = spriteRect.width;
+            var spriteHeight = spriteRect.height;
+            var expectWidth = richTextElement.style.imageWidth;
+            var expectHeight = richTextElement.style.imageHeight;
+
+            //follow the original rule, expectHeight must less then lineHeight
+            if(expectHeight > 0 && expectHeight < this.lineHeight ) {
+                scaleFactor = expectHeight / spriteHeight;
+                spriteWidth = spriteWidth * scaleFactor;
+                spriteHeight = spriteHeight * scaleFactor;
+            } else {
+                scaleFactor = this.lineHeight / spriteHeight;
+                spriteWidth = spriteWidth * scaleFactor;
+                spriteHeight = spriteHeight * scaleFactor;
             }
+
+            if(expectWidth > 0) spriteWidth = expectWidth;
+
             if(this.maxWidth > 0) {
-                if(this._lineOffsetX + spriteRect.width * scaleFactor > this.maxWidth) {
+                if(this._lineOffsetX + spriteWidth > this.maxWidth) {
                     this._updateLineInfo();
                 }
-                this._lineOffsetX += spriteRect.width * scaleFactor;
+                this._lineOffsetX += spriteWidth;
 
             } else {
-                this._lineOffsetX += spriteRect.width * scaleFactor;
+                this._lineOffsetX += spriteWidth;
                 if(this._lineOffsetX > this._labelWidth) {
                     this._labelWidth = this._lineOffsetX;
                 }
             }
             this._applySpriteFrame(spriteFrame);
-            sprite.setContentSize(cc.size(spriteRect.width * scaleFactor,
-                                          spriteRect.height * scaleFactor));
+            sprite.setContentSize(spriteWidth, spriteHeight);
             sprite._lineCount = this._lineCount;
 
             if(richTextElement.style.event) {
@@ -629,7 +628,8 @@ var RichText = cc.Class({
         }
         this._labelHeight =this._lineCount * this.lineHeight;
 
-        sgNode._setContentSize(cc.size(this._labelWidth, this._labelHeight));
+        sgNode._setContentSize(this._labelWidth, this._labelHeight);
+        this.node.emit('size-changed');
 
         this._updateRichTextPosition();
         this._layoutDirty = false;
@@ -766,8 +766,16 @@ var RichText = cc.Class({
                 label._clickHandler = textStyle.event.click;
             }
         }
-    }
+    },
 
+    onDestroy: function () {
+        this._super();
+        for (var i = 0; i < this._labelSegments.length; ++i) {
+            this._labelSegments[i].removeFromParent(true);
+            _ccsg.Label.pool.put(this._labelSegments[i]);
+        }
+        this._resetState();
+    }
  });
 
  cc.RichText = module.exports = RichText;

@@ -194,6 +194,17 @@ var PageView = cc.Class({
         },
 
         /**
+         * !#en The time required to turn over a page. unit: second
+         * !#zh 每个页面翻页时所需时间。单位：秒
+         * @property {Number} pageTurningSpeed
+         */
+        pageTurningSpeed: {
+            default: 0.3,
+            type: cc.Float,
+            tooltip: CC_DEV && 'i18n:COMPONENT.pageview.pageTurningSpeed'
+        },
+
+        /**
          * !#en PageView events callback
          * !#zh 滚动视图的事件回调函数
          * @property {Component.EventHandler[]} pageEvents
@@ -212,21 +223,20 @@ var PageView = cc.Class({
     },
 
     __preload: function () {
-        this._super();
         this.node.on('size-changed', this._updateAllPagesSize, this);
     },
 
     onEnable: function () {
         this._super();
         if(!CC_EDITOR) {
-            this.node.on('scroll-ended', this._dispatchPageTurningEvent, this);
+            this.node.on('scroll-ended-with-threshold', this._dispatchPageTurningEvent, this);
         }
     },
 
     onDisable: function () {
         this._super();
         if(!CC_EDITOR) {
-            this.node.off('scroll-ended', this._dispatchPageTurningEvent, this);
+            this.node.off('scroll-ended-with-threshold', this._dispatchPageTurningEvent, this);
         }
     },
 
@@ -238,7 +248,6 @@ var PageView = cc.Class({
     },
 
     onDestroy: function() {
-        this._super();
         this.node.off('size-changed', this._updateAllPagesSize, this);
     },
 
@@ -560,20 +569,21 @@ var PageView = cc.Class({
         }
         else {
             var index = this._curPageIdx, nextIndex = index + this._getDragDirection(moveOffset);
+            var timeInSecond = this.pageTurningSpeed * Math.abs(index - nextIndex);
             if (nextIndex < this._pages.length) {
                 if (this._isScrollable(moveOffset, index, nextIndex)) {
-                    this.scrollToPage(nextIndex);
+                    this.scrollToPage(nextIndex, timeInSecond);
                     return;
                 }
                 else {
                     var touchMoveVelocity = this._calculateTouchMoveVelocity();
                     if (this._isQuicklyScrollable(touchMoveVelocity)) {
-                        this.scrollToPage(nextIndex);
+                        this.scrollToPage(nextIndex, timeInSecond);
                         return;
                     }
                 }
             }
-            this.scrollToPage(index);
+            this.scrollToPage(index, timeInSecond);
         }
     },
 
@@ -607,6 +617,6 @@ cc.PageView = module.exports = PageView;
  * !#zh
  * 注意：此事件是从该组件所属的 Node 上面派发出来的，需要用 node.on 来监听。
  * @event page-turning
- * @param {Event} event
+ * @param {Event.EventCustom} event
  * @param {PageView} event.detail - The PageView component.
  */

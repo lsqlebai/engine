@@ -128,7 +128,7 @@ cc.rendererWebGL = {
     _cacheToBufferCmds: {},                              // an array saves the renderer commands need for cache to other canvas
     _cacheInstanceIds: [],
     _currentID: 0,
-    _clearColor: {r: 0, g: 0, b: 0, a: 255},              //background color,default BLACK
+    _clearColor: {r: 0, g: 0, b: 0, a: 1},              //background color,default BLACK
 
     init: function () {
         var gl = cc._renderContext;
@@ -268,9 +268,7 @@ cc.rendererWebGL = {
             if (cmdList.indexOf(cmd) === -1)
                 cmdList.push(cmd);
         } else {
-            if (this._renderCmds.indexOf(cmd) === -1) {
-                this._renderCmds.push(cmd);
-            }
+            this._renderCmds.push(cmd);
         }
     },
 
@@ -313,17 +311,22 @@ cc.rendererWebGL = {
     },
 
     _updateBatchedInfo: function (texture, blendFunc, shaderProgram) {
-        if (texture) {
+        if (texture !== _batchedInfo.texture ||
+            blendFunc.src !== _batchedInfo.blendSrc ||
+            blendFunc.dst !== _batchedInfo.blendDst ||
+            shaderProgram !== _batchedInfo.shader) {
+            // Draw batched elements
+            this._batchRendering();
+            // Update _batchedInfo
             _batchedInfo.texture = texture;
-        }
-
-        if (blendFunc) {
             _batchedInfo.blendSrc = blendFunc.src;
             _batchedInfo.blendDst = blendFunc.dst;
-        }
-
-        if (shaderProgram) {
             _batchedInfo.shader = shaderProgram;
+
+            return true;
+        }
+        else {
+            return false;
         }
     },
 
