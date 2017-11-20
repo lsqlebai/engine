@@ -31,10 +31,6 @@ var JS = cc.js;
 var Destroying = Flags.Destroying;
 var DontDestroy = Flags.DontDestroy;
 
-var SCALE_CHANGED = 'scale-changed';
-var POSITION_CHANGED = 'position-changed';
-var SIZE_CHANGED = 'size-changed';
-var ANCHOR_CHANGED = 'anchor-changed';
 var CHILD_ADDED = 'child-added';
 var CHILD_REMOVED = 'child-removed';
 

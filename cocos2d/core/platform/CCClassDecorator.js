@@ -280,13 +280,14 @@ var ccclass = checkCtorArgument(function (ctor, name) {
 
     // validate methods
     if (CC_DEV) {
-        var methods = Object.getOwnPropertyNames(ctor.prototype);
-        for (var i = 0; i < methods.length; ++i) {
-            var methodName = methods[i];
-            if (methodName !== 'constructor') {
-                var func = ctor.prototype[methodName];
+        var propNames = Object.getOwnPropertyNames(ctor.prototype);
+        for (var i = 0; i < propNames.length; ++i) {
+            var prop = propNames[i];
+            if (prop !== 'constructor') {
+                var desc = Object.getOwnPropertyDescriptor(ctor.prototype, prop);
+                var func = desc && desc.value;
                 if (typeof func === 'function') {
-                    Preprocess.doValidateMethodWithProps_DEV(func, methodName, JS.getClassName(ctor), ctor, base);
+                    Preprocess.doValidateMethodWithProps_DEV(func, prop, JS.getClassName(ctor), ctor, base);
                 }
             }
         }
@@ -345,7 +346,7 @@ var ccclass = checkCtorArgument(function (ctor, name) {
  *
  *     &#64;property
  *     set width (value) {
- *         return this._width = value;
+ *         this._width = value;
  *     }
  *
  *     &#64;property

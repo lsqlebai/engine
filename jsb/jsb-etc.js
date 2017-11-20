@@ -55,6 +55,7 @@ cc.js.mixin(cc.path, {
 });
 
 // cc.Scheduler
+var _callbackId = 0;
 cc.Scheduler.prototype.schedule = function (callback, target, interval, repeat, delay, paused) {
     if (delay === undefined || paused === undefined) {
         paused = !!repeat;
@@ -65,7 +66,13 @@ cc.Scheduler.prototype.schedule = function (callback, target, interval, repeat, 
         repeat = isFinite(repeat) ? repeat : cc.macro.REPEAT_FOREVER;
     }
     delay = delay || 0;
-    this.scheduleCallbackForTarget(target, callback, interval, repeat, delay, paused);
+    var instanceId = target.__instanceId || target.uuid;
+    cc.assertID(!isNaN(instanceId), 1510);
+    if (!callback.__callbackId) {
+        callback.__callbackId = _callbackId++;
+    }
+    var key = instanceId + '_' + callback.__callbackId;
+    this._schedule(target, callback, interval, repeat, delay, paused, key);
 };
 cc.Scheduler.prototype.scheduleUpdate = cc.Scheduler.prototype.scheduleUpdateForTarget;
 cc.Scheduler.prototype._unschedule = cc.Scheduler.prototype.unschedule;
@@ -75,7 +82,10 @@ cc.Scheduler.prototype.unschedule = function (callback, target) {
         target = callback;
         callback = tmp;
     }
-    this._unschedule(target, callback);
+    var instanceId = target.__instanceId || target.uuid;
+    cc.assertID(!isNaN(instanceId) && !isNaN(callback.__callbackId), 1510);
+    var key = instanceId + '_' + callback.__callbackId;
+    this._unschedule(key, target);
 };
 
 // Node
@@ -90,6 +100,7 @@ cc.view.setOrientation = function () {};
 var _windowTimeIntervalId = 0;
 var _windowTimeFunHash = {};
 var WindowTimeFun = function (code) {
+    this.__instanceId = cc.ClassManager.getNewInstanceId();
     this._intervalId = _windowTimeIntervalId++;
     this._code = code;
 };
@@ -198,8 +209,8 @@ if (cc.Image && cc.Image.setPNGPremultipliedAlphaEnabled) {
 }
 
 // __errorHandler
-window.__errorHandler = function (filename, lineno, message) {
-};
+// window.__errorHandler = function (filename, lineno, message, stack) {
+// };
 
 // global cleanup. Dangerous!!! please do not invoke this function, it's used internally by the restart process
 window.__cleanup = function () {
