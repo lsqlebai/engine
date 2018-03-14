@@ -26,6 +26,11 @@
 'use strict';
 
 var AutoReleaseUtils = require('../cocos2d/core/load-pipeline/auto-release-utils');
+var ComponentScheduler = require('../cocos2d/core/component-scheduler');
+var NodeActivator = require('../cocos2d/core/node-activator');
+var EventListeners = require('../cocos2d/core/event/event-listeners');
+
+cc.director._purgeDirector = cc.director.purgeDirector;
 
 // cc.director
 cc.js.mixin(cc.director, {
@@ -34,10 +39,15 @@ cc.js.mixin(cc.director, {
      * All platform independent init process should be occupied here.
      */
     sharedInit: function () {
+        this._compScheduler = new ComponentScheduler();
+        this._nodeActivator = new NodeActivator();
+
+        var scheduler = this.getScheduler();
+
         // Animation manager
         if (cc.AnimationManager) {
             this._animationManager = new cc.AnimationManager();
-            this.getScheduler().scheduleUpdate(this._animationManager, cc.Scheduler.PRIORITY_SYSTEM, false);
+            scheduler.scheduleUpdate(this._animationManager, cc.Scheduler.PRIORITY_SYSTEM, false);
         }
         else {
             this._animationManager = null;
@@ -46,14 +56,31 @@ cc.js.mixin(cc.director, {
         // collider manager
         if (cc.CollisionManager) {
             this._collisionManager = new cc.CollisionManager();
-            this.getScheduler().scheduleUpdate(this._collisionManager, cc.Scheduler.PRIORITY_SYSTEM, false);
+            scheduler.scheduleUpdate(this._collisionManager, cc.Scheduler.PRIORITY_SYSTEM, false);
         }
         else {
             this._collisionManager = null;
         }
 
+        // physics manager
+        if (cc.PhysicsManager) {
+            this._physicsManager = new cc.PhysicsManager();
+            this.getScheduler().scheduleUpdate(this._physicsManager, cc.Scheduler.PRIORITY_SYSTEM, false);
+        }
+        else {
+            this._physicsManager = null;
+        }
+
         // WidgetManager
         cc._widgetManager.init(this);
+
+        cc.loader.init(this);
+    },
+
+    purgeDirector: function () {
+        this._compScheduler.unscheduleAll();
+        this._nodeActivator.reset();
+        this._purgeDirector();
     },
 
     /**
@@ -65,12 +92,6 @@ cc.js.mixin(cc.director, {
         if (cc.eventManager)
             cc.eventManager.setEnabled(true);
 
-        // Action manager
-        var actionManager = this.getActionManager();
-        if (actionManager) {
-            this.getScheduler().scheduleUpdate(actionManager, cc.Scheduler.PRIORITY_SYSTEM, false);
-        }
-
         // Animation manager
         if (this._animationManager) {
             this.getScheduler().scheduleUpdate(this._animationManager, cc.Scheduler.PRIORITY_SYSTEM, false);
@@ -81,7 +102,26 @@ cc.js.mixin(cc.director, {
             this.getScheduler().scheduleUpdate(this._collisionManager, cc.Scheduler.PRIORITY_SYSTEM, false);
         }
 
+        // Physics manager
+        if (this._physicsManager) {
+            this.getScheduler().scheduleUpdate(this._physicsManager, cc.Scheduler.PRIORITY_SYSTEM, false);
+        }
+
         this.startAnimation();
+    },
+
+    getActionManager: function () {
+        return this._actionManager;
+    },
+
+    setActionManager: function (actionManager) {
+        if (this._actionManager !== actionManager) {
+            if (this._actionManager) {
+                this._scheduler.unscheduleUpdate(this._actionManager);
+            }
+            this._actionManager = actionManager;
+            this._scheduler.scheduleUpdate(this._actionManager, cc.Scheduler.PRIORITY_SYSTEM, false);
+        }
     },
 
     /**
@@ -103,6 +143,15 @@ cc.js.mixin(cc.director, {
     },
 
     /**
+     * Returns the cc.PhysicsManager associated with this director.
+     * @method getPhysicsManager
+     * @return {PhysicsManager}
+     */
+    getPhysicsManager: function () {
+        return this._physicsManager;
+    },
+
+    /**
      * Returns current running Scene. Director can only run one Scene at the time.
      * @method getScene
      * @return {Scene}
@@ -120,16 +169,26 @@ cc.js.mixin(cc.director, {
      * @param {Function} [onLaunched] - The function invoked at the scene after launch.
      */
     runSceneImmediate: function (scene, onBeforeLoadScene, onLaunched) {
-        var id, node, game = cc.game;
-        var persistNodes = game._persistRootNodes;
+        const console = window.console;    // should mangle
+        const INIT_SCENE = CC_DEBUG ? 'InitScene' : 'I';
+        const AUTO_RELEASE = CC_DEBUG ? 'AutoRelease' : 'AR';
+        const DESTROY = CC_DEBUG ? 'Destroy' : 'D';
+        const ATTACH_PERSIST = CC_DEBUG ? 'AttachPersist' : 'AP';
+        const ACTIVATE = CC_DEBUG ? 'Activate' : 'A';
 
         if (scene instanceof cc.Scene) {
+            console.time(INIT_SCENE);
             scene._load();  // ensure scene initialized
+            console.timeEnd(INIT_SCENE);
         }
 
         // detach persist nodes
-        for (id in persistNodes) {
-            node = persistNodes[id];
+        var game = cc.game;
+        var persistNodeList = Object.keys(game._persistRootNodes).map(function (x) {
+            return game._persistRootNodes[x];
+        });
+        for (let i = 0; i < persistNodeList.length; i++) {
+            let node = persistNodeList[i];
             game._ignoreRemovePersistNode = node;
             node.parent = null;
             game._ignoreRemovePersistNode = null;
@@ -138,10 +197,13 @@ cc.js.mixin(cc.director, {
         var oldScene = this._scene;
 
         // auto release assets
+        console.time(AUTO_RELEASE);
         var autoReleaseAssets = oldScene && oldScene.autoReleaseAssets && oldScene.dependAssets;
-        AutoReleaseUtils.autoRelease(cc.loader, autoReleaseAssets, scene.dependAssets);
+        AutoReleaseUtils.autoRelease(autoReleaseAssets, scene.dependAssets, persistNodeList);
+        console.timeEnd(AUTO_RELEASE);
 
         // unload scene
+        console.time(DESTROY);
         if (cc.isValid(oldScene)) {
             oldScene.destroy();
         }
@@ -150,6 +212,7 @@ cc.js.mixin(cc.director, {
 
         // purge destroyed nodes belongs to old scene
         cc.Object._deferredDestroy();
+        console.timeEnd(DESTROY);
 
         if (onBeforeLoadScene) {
             onBeforeLoadScene();
@@ -164,21 +227,24 @@ cc.js.mixin(cc.director, {
             sgScene = scene._sgNode;
 
             // Re-attach or replace persist nodes
-            for (id in persistNodes) {
-                node = persistNodes[id];
-                var existNode = scene.getChildByUuid(id);
+            console.time(ATTACH_PERSIST);
+            for (let i = 0; i < persistNodeList.length; i++) {
+                let node = persistNodeList[i];
+                var existNode = scene.getChildByUuid(node.uuid);
                 if (existNode) {
                     // scene also contains the persist node, select the old one
                     var index = existNode.getSiblingIndex();
                     existNode._destroyImmediate();
-                    node.parent = scene;
-                    node.setSiblingIndex(index);
+                    scene.insertChild(node, index);
                 }
                 else {
                     node.parent = scene;
                 }
             }
+            console.timeEnd(ATTACH_PERSIST);
+            console.time(ACTIVATE);
             scene._activate();
+            console.timeEnd(ACTIVATE);
         }
 
         // Run or replace rendering scene
@@ -344,7 +410,9 @@ cc.js.mixin(cc.director, {
             }
         }
         //cc.AssetLibrary.unloadAsset(uuid);     // force reload
+        console.time('LoadScene ' + uuid);
         cc.AssetLibrary.loadAsset(uuid, function (error, sceneAsset) {
+            console.timeEnd('LoadScene ' + uuid);
             var self = cc.director;
             self._loadingScene = '';
             if (error) {
@@ -381,8 +449,27 @@ cc.js.mixin(cc.director, {
                 onLaunched(error);
             }
         });
-    }
+    },
+
+    __fastOn: function (type, callback, target) {
+        var listeners = this._bubblingListeners;
+        if (!listeners) {
+            listeners = this._bubblingListeners = new EventListeners();
+        }
+        listeners.add(type, callback, target);
+        this._addEventFlag(type, listeners, false);
+    },
+
+    __fastOff: function (type, callback, target) {
+        var listeners = this._bubblingListeners;
+        if (listeners) {
+            listeners.remove(type, callback, target);
+            this._purgeEventFlag(type, listeners, false);
+        }
+    },
 });
+
+cc.defineGetterSetter(cc.director, "actionManager", cc.director.getActionManager, cc.director.setActionManager);
 
 cc.EventTarget.call(cc.director);
 cc.js.addon(cc.director, cc.EventTarget.prototype);
@@ -396,56 +483,56 @@ cc.Director.EVENT_AFTER_UPDATE = 'director_after_update';
 cc.Director.EVENT_BEFORE_SCENE_LOADING = "director_before_scene_loading";
 cc.Director.EVENT_BEFORE_SCENE_LAUNCH = 'director_before_scene_launch';
 cc.Director.EVENT_AFTER_SCENE_LAUNCH = "director_after_scene_launch";
-cc.Director.EVENT_COMPONENT_UPDATE = 'director_component_update';
-cc.Director.EVENT_COMPONENT_LATE_UPDATE = 'director_component_late_update';
 cc.Director._EVENT_NEXT_TICK = '_director_next_tick';
 
 // Register listener objects in cc.Director to avoid possible crash caused by cc.eventManager.addCustomListener.
 // For reasons that we don't understand yet, JSFunctionWrapper couldn't very well hold function reference in cc.eventManager.
-cc.Director._beforeUpdateListener = {
+cc.Director._beforeUpdateListener = cc.EventListener.create({
     event: cc.EventListener.CUSTOM,
     eventName: cc.Director.EVENT_BEFORE_UPDATE,
     callback: function () {
-        var dt = cc.director.getDeltaTime();
         // cocos-creator/fireball#5157
         cc.director.emit(cc.Director._EVENT_NEXT_TICK);
-        // Call start for new added components
+        // User can use this event to do things before update
         cc.director.emit(cc.Director.EVENT_BEFORE_UPDATE);
+        // Call start for new added components
+        cc.director._compScheduler.startPhase();
         // Update for components
-        cc.director.emit(cc.Director.EVENT_COMPONENT_UPDATE, dt);
+        var dt = cc.director.getDeltaTime();
+        cc.director._compScheduler.updatePhase(dt);
     }
-};
-cc.Director._afterUpdateListener = {
+});
+cc.Director._afterUpdateListener = cc.EventListener.create({
     event: cc.EventListener.CUSTOM,
     eventName: cc.Director.EVENT_AFTER_UPDATE,
     callback: function () {
-        var dt = cc.director.getDeltaTime();
         // Late update for components
-        cc.director.emit(cc.Director.EVENT_COMPONENT_LATE_UPDATE, dt);
+        var dt = cc.director.getDeltaTime();
+        cc.director._compScheduler.lateUpdatePhase(dt);
         // User can use this event to do things after update
         cc.director.emit(cc.Director.EVENT_AFTER_UPDATE);
         // Destroy entities that have been removed recently
         cc.Object._deferredDestroy();
-        
+
         cc.director.emit(cc.Director.EVENT_BEFORE_VISIT, this);
     }
-};
-cc.Director._afterVisitListener = {
+});
+cc.Director._afterVisitListener = cc.EventListener.create({
     event: cc.EventListener.CUSTOM,
     eventName: cc.Director.EVENT_AFTER_VISIT,
     callback: function () {
         cc.director.emit(cc.Director.EVENT_AFTER_VISIT, this);
     }
-};
-cc.Director._afterDrawListener = {
+});
+cc.Director._afterDrawListener = cc.EventListener.create({
     event: cc.EventListener.CUSTOM,
     eventName: cc.Director.EVENT_AFTER_DRAW,
     callback: function () {
         cc.director.emit(cc.Director.EVENT_AFTER_DRAW, this);
     }
-};
+});
 
-cc.eventManager.addEventListenerWithFixedPriority(cc.EventListener.create(cc.Director._beforeUpdateListener), 1);
-cc.eventManager.addEventListenerWithFixedPriority(cc.EventListener.create(cc.Director._afterUpdateListener), 1);
-cc.eventManager.addEventListenerWithFixedPriority(cc.EventListener.create(cc.Director._afterVisitListener), 1);
-cc.eventManager.addEventListenerWithFixedPriority(cc.EventListener.create(cc.Director._afterDrawListener), 1);
+cc.eventManager.addEventListenerWithFixedPriority(cc.Director._beforeUpdateListener, 1);
+cc.eventManager.addEventListenerWithFixedPriority(cc.Director._afterUpdateListener, 1);
+cc.eventManager.addEventListenerWithFixedPriority(cc.Director._afterVisitListener, 1);
+cc.eventManager.addEventListenerWithFixedPriority(cc.Director._afterDrawListener, 1);

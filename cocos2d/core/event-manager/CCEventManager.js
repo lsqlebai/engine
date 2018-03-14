@@ -22,15 +22,14 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  ****************************************************************************/
+var js = require('../platform/js');
 
 var _EventListenerVector = cc._Class.extend({
-    _fixedListeners: null,
-    _sceneGraphListeners: null,
-    gt0Index: 0,
 
     ctor: function () {
         this._fixedListeners = [];
         this._sceneGraphListeners = [];
+        this.gt0Index = 0;
     },
 
     size: function () {
@@ -78,8 +77,6 @@ var __getListenerID = function (event) {
         return cc._EventListenerKeyboard.LISTENER_ID;
     if (type.startsWith(eventType.MOUSE))
         return cc._EventListenerMouse.LISTENER_ID;
-    if (type === eventType.FOCUS)
-        return cc._EventListenerFocus.LISTENER_ID;
     if (type.startsWith(eventType.TOUCH)){
         // Touch listener is very special, it contains two kinds of listeners, EventListenerTouchOneByOne and EventListenerTouchAllAtOnce.
         // return UNKNOWN instead.
@@ -88,7 +85,7 @@ var __getListenerID = function (event) {
     return "";
 };
 
-/**
+/*
  * !#en
  * <p>
  *  cc.eventManager is a singleton object which manages event listener subscriptions and event dispatching. <br/>
@@ -102,9 +99,10 @@ var __getListenerID = function (event) {
  * 在 Creator 的设计中，鼠标，触摸和自定义事件的监听和派发请参考 http://cocos.com/docs/creator/scripting/events.html。
  *
  * @class eventManager
+ * @static
  * @example {@link utils/api/engine/docs/cocos2d/core/event-manager/CCEventManager/addListener.js}
  */
-cc.eventManager = {
+var eventManager = {
     //Priority dirty flag
     DIRTY_NONE: 0,
     DIRTY_FIXED_PRIORITY: 1 << 0,
@@ -142,7 +140,7 @@ cc.eventManager = {
      * !#zh 暂停传入的 node 相关的所有监听器的事件响应。
      * @method pauseTarget
      * @param {Node} node
-     * @param {Boolean} recursive
+     * @param {Boolean} [recursive=false]
      */
     pauseTarget: function (node, recursive) {
         if (!(node instanceof cc._BaseNode || node instanceof _ccsg.Node)) {
@@ -166,7 +164,7 @@ cc.eventManager = {
      * !#zh 恢复传入的 node 相关的所有监听器的事件响应。
      * @method resumeTarget
      * @param {Node} node
-     * @param {Boolean} recursive
+     * @param {Boolean} [recursive=false]
      */
     resumeTarget: function (node, recursive) {
         if (!(node instanceof cc._BaseNode || node instanceof _ccsg.Node)) {
@@ -326,7 +324,7 @@ cc.eventManager = {
     },
 
     _sortEventListenersOfSceneGraphPriorityDes: function (l1, l2) {
-        var locNodePriorityMap = cc.eventManager._nodePriorityMap,
+        var locNodePriorityMap = eventManager._nodePriorityMap,
             node1 = l1._getSceneGraphPriority(),
             node2 = l2._getSceneGraphPriority();
         if (!l2 || !node2 || !locNodePriorityMap[node2.__instanceId])
@@ -517,7 +515,7 @@ cc.eventManager = {
 
         // If the event was stopped, return directly.
         if (event.isStopped()) {
-            cc.eventManager._updateTouchListeners(event);
+            eventManager._updateTouchListeners(event);
             return true;
         }
 
@@ -549,9 +547,8 @@ cc.eventManager = {
         if (oneByOneListeners) {
             for (var i = 0; i < originalTouches.length; i++) {
                 event.currentTouch = originalTouches[i];
+                event._propagationStopped = event._propagationImmediateStopped = false;
                 this._dispatchEventToListeners(oneByOneListeners, this._onTouchEventCallback, oneByOneArgsObj);
-                if (event.isStopped())
-                    return;
             }
         }
 
@@ -584,7 +581,7 @@ cc.eventManager = {
 
         // If the event was stopped, return directly.
         if (event.isStopped()) {
-            cc.eventManager._updateTouchListeners(event);
+            eventManager._updateTouchListeners(event);
             return true;
         }
         return false;
@@ -821,7 +818,7 @@ cc.eventManager = {
             isFound = this._removeListenerInVector(sceneGraphPriorityListeners, listener);
             if (isFound){
                 // fixed #4160: Dirty flag need to be updated after listeners were removed.
-               this._setDirty(listener._getListenerID(), this.DIRTY_SCENE_GRAPH_PRIORITY);
+                this._setDirty(listener._getListenerID(), this.DIRTY_SCENE_GRAPH_PRIORITY);
             }else{
                 isFound = this._removeListenerInVector(fixedPriorityListeners, listener);
                 if (isFound)
@@ -912,7 +909,7 @@ cc.eventManager = {
      *
      * @method removeListeners
      * @param {Number|Node} listenerType - listenerType or a node
-     * @param {Boolean} recursive
+     * @param {Boolean} [recursive=false]
      */
     removeListeners: function (listenerType, recursive) {
         var i, _t = this;
@@ -951,10 +948,8 @@ cc.eventManager = {
 
             if (recursive === true) {
                 var locChildren = listenerType.getChildren(), len;
-                if (locChildren != null) {
-                    for (i = 0, len = locChildren.length; i < len; i++)
-                        _t.removeListeners(locChildren[i], true);
-                }
+                for (i = 0, len = locChildren.length; i< len; i++)
+                    _t.removeListeners(locChildren[i], true);
             }
         } else {
             if (listenerType === cc.EventListener.TOUCH_ONE_BY_ONE)
@@ -1095,3 +1090,11 @@ cc.eventManager = {
         this.dispatchEvent(ev);
     }
 };
+
+
+js.get(cc, 'eventManager', function () {
+    cc.warnID(1405, 'cc.eventManager', 'cc.EventTarget or cc.systemEvent');
+    return eventManager;
+});
+
+module.exports = eventManager;

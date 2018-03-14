@@ -23,8 +23,6 @@
  THE SOFTWARE.
  ****************************************************************************/
 
-var _args = [];
-
 /**
  * !#en
  * Component will register a event to target component's handler.
@@ -95,28 +93,23 @@ cc.Component.EventHandler = cc.Class({
          * @method emitEvents
          * @param {Component.EventHandler[]} events
          * @param {any} ...params
-         * @statics
+         * @static
          */
-        emitEvents: CC_JSB ? function (events, ...args) {
-            for (var i = 0, l = events.length; i < l; i++) {
-                var event = events[i];
-                if (!(event instanceof cc.Component.EventHandler)) continue;
-
-                event.emit(args);
-            }
-        } : function(events) {
+        emitEvents: function(events) {
             'use strict';
-            _args.length = arguments.length > 0 ? arguments.length - 1 : 0;
-            for (var i = 0, l = _args.length; i < l; i++) {
-                _args[i] = arguments[i+1];
+            var args, i, l;
+            if (arguments.length > 0) {
+                args = new Array(arguments.length - 1);
+                for (i = 0, l = args.length; i < l; i++) {
+                    args[i] = arguments[i+1];
+                }
             }
             for (i = 0, l = events.length; i < l; i++) {
                 var event = events[i];
                 if (!(event instanceof cc.Component.EventHandler)) continue;
 
-                event.emit(_args);
+                event.emit(args);
             }
-            _args.length = 0;
         }
     },
 
@@ -143,7 +136,8 @@ cc.Component.EventHandler = cc.Class({
         var handler = comp[this.handler];
         if (typeof(handler) !== 'function') return;
 
-        if (this.customEventData) {
+        if (this.customEventData != null && this.customEventData !== '') {
+            params = params.slice();
             params.push(this.customEventData);
         }
 

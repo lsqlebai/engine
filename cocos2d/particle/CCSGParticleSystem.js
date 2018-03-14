@@ -24,8 +24,9 @@
  THE SOFTWARE.
  ****************************************************************************/
 
-var PNGReader = require('../cocos2d/particle/CCPNGReader');
-var tiffReader = require('../cocos2d/particle/CCTIFFReader');
+var PNGReader = require('./CCPNGReader');
+var tiffReader = require('./CCTIFFReader');
+require('../compression/ZipUtils');
 
 // ideas taken from:
 //   . The ocean spray in your face [Jeff Lander]
@@ -62,11 +63,10 @@ var tiffReader = require('../cocos2d/particle/CCTIFFReader');
  * @param {Number} [rotation=0]
  * @param {Number} [deltaRotation=0]
  * @param {Number} [timeToLive=0]
- * @param {Number} [atlasIndex=0]
  * @param {cc.Particle.ModeA} [modeA=]
  * @param {cc.Particle.ModeA} [modeB=]
  */
-cc.Particle = function (pos, startPos, color, deltaColor, size, deltaSize, rotation, deltaRotation, timeToLive, atlasIndex, modeA, modeB) {
+cc.Particle = function (pos, startPos, color, deltaColor, size, deltaSize, rotation, deltaRotation, timeToLive, modeA, modeB) {
     this.pos = pos || cc.v2(0, 0);
     this.startPos = startPos || cc.v2(0, 0);
     this.color = color || cc.color(0, 0, 0, 255);
@@ -76,7 +76,6 @@ cc.Particle = function (pos, startPos, color, deltaColor, size, deltaSize, rotat
     this.rotation = rotation || 0;
     this.deltaRotation = deltaRotation || 0;
     this.timeToLive = timeToLive || 0;
-    this.atlasIndex = atlasIndex || 0;
     this.modeA = modeA ? modeA : new cc.Particle.ModeA();
     this.modeB = modeB ? modeB : new cc.Particle.ModeB();
     this.isChangeColor = false;
@@ -164,10 +163,7 @@ cc.Particle.TemporaryPoints = [
  * @extends _ccsg.Node
  *
  * @property {Boolean}              opacityModifyRGB    - Indicate whether the alpha value modify color.
- * @property {cc.SpriteBatchNode}   batchNode           - Weak reference to the sprite batch node.
  * @property {Boolean}              active              - <@readonly> Indicate whether the particle system is activated.
- * @property {Number}               shapeType           - ShapeType of ParticleSystem : ccsg.ParticleSystem.BALL_SHAPE | ccsg.ParticleSystem.STAR_SHAPE.
- * @property {Number}               atlasIndex          - Index of system in batch node array.
  * @property {Number}               particleCount       - Current quantity of particles that are being simulated.
  * @property {Number}               duration            - How many seconds the emitter wil run. -1 means 'forever'
  * @property {cc.Vec2}             sourcePos           - Source position of the emitter.
@@ -241,11 +237,6 @@ _ccsg.ParticleSystem = _ccsg.Node.extend({
     //!  particle idx
     _particleIdx: 0,
 
-    _batchNode: null,
-    atlasIndex: 0,
-
-    //true if scaled or rotated
-    _transformSystemDirty: false,
     _allocatedParticles: 0,
 
     _isActive: false,
@@ -310,10 +301,7 @@ _ccsg.ParticleSystem = _ccsg.Node.extend({
         this._pointZeroForParticle = cc.p(0, 0);
         this._emitCounter = 0;
         this._particleIdx = 0;
-        this._batchNode = null;
-        this.atlasIndex = 0;
 
-        this._transformSystemDirty = false;
         this._allocatedParticles = 0;
         this._isActive = false;
         this.particleCount = 0;
@@ -342,7 +330,6 @@ _ccsg.ParticleSystem = _ccsg.Node.extend({
 
         if (!plistFile || cc.js.isNumber(plistFile)) {
             var ton = plistFile || 100;
-            this.setDrawMode(_ccsg.ParticleSystem.TEXTURE_MODE);
             this.initWithTotalParticles(ton);
         } else if (typeof plistFile === 'string') {
             this.initWithFile(plistFile);
@@ -375,70 +362,6 @@ _ccsg.ParticleSystem = _ccsg.Node.extend({
      */
     initTexCoordsWithRect:function (pointRect) {
         this._renderCmd.initTexCoordsWithRect(pointRect);
-    },
-
-    /**
-     * return weak reference to the cc.SpriteBatchNode that renders the _ccsg.Sprite
-     * @return {cc.ParticleBatchNode}
-     */
-    getBatchNode:function () {
-        return this._batchNode;
-    },
-
-    /**
-     *  set weak reference to the cc.SpriteBatchNode that renders the _ccsg.Sprite
-     * @param {cc.ParticleBatchNode} batchNode
-     */
-    setBatchNode:function (batchNode) {
-        this._renderCmd.setBatchNode(batchNode);
-    },
-
-    /**
-     * return index of system in batch node array
-     * @return {Number}
-     */
-    getAtlasIndex:function () {
-        return this.atlasIndex;
-    },
-
-    /**
-     * set index of system in batch node array
-     * @param {Number} atlasIndex
-     */
-    setAtlasIndex:function (atlasIndex) {
-        this.atlasIndex = atlasIndex;
-    },
-
-    /**
-     * Return DrawMode of ParticleSystem   (Canvas Mode only)
-     * @return {Number}
-     */
-    getDrawMode:function () {
-        return this._renderCmd.getDrawMode();
-    },
-
-    /**
-     * DrawMode of ParticleSystem setter   (Canvas Mode only)
-     * @param {Number} drawMode
-     */
-    setDrawMode:function (drawMode) {
-        this._renderCmd.setDrawMode(drawMode);
-    },
-
-    /**
-     * Return ShapeType of ParticleSystem  (Canvas Mode only)
-     * @return {Number}
-     */
-    getShapeType:function () {
-        return this._renderCmd.getShapeType();
-    },
-
-    /**
-     * ShapeType of ParticleSystem setter  (Canvas Mode only)
-     * @param {Number} shapeType
-     */
-    setShapeType:function (shapeType) {
-        this._renderCmd.setShapeType(shapeType);
     },
 
     /**
@@ -807,27 +730,6 @@ _ccsg.ParticleSystem = _ccsg.Node.extend({
     },
     //////////////////////////////////////////////////////////////////////////
 
-    //don't use a transform matrix, this is faster
-    setScale:function (scale, scaleY) {
-        this._transformSystemDirty = true;
-        _ccsg.Node.prototype.setScale.call(this, scale, scaleY);
-    },
-
-    setRotation:function (newRotation) {
-        this._transformSystemDirty = true;
-        _ccsg.Node.prototype.setRotation.call(this, newRotation);
-    },
-
-    setScaleX:function (newScaleX) {
-        this._transformSystemDirty = true;
-        _ccsg.Node.prototype.setScaleX.call(this, newScaleX);
-    },
-
-    setScaleY:function (newScaleY) {
-        this._transformSystemDirty = true;
-        _ccsg.Node.prototype.setScaleY.call(this, newScaleY);
-    },
-
     /**
      * get start size in pixels of each particle
      * @return {Number}
@@ -1068,7 +970,7 @@ _ccsg.ParticleSystem = _ccsg.Node.extend({
         if(!texture)
             return;
 
-        if(texture.isLoaded()){
+        if(texture.loaded){
             this.setTextureWithRect(texture, cc.rect(0, 0, texture.width, texture.height));
         } else {
             this._textureLoaded = false;
@@ -1370,56 +1272,53 @@ _ccsg.ParticleSystem = _ccsg.Node.extend({
             // emission Rate
             this.emissionRate = this._totalParticles / this.life;
 
-            //don't get the internal texture if a batchNode is used
-            if (!this._batchNode) {
-                // Set a compatible default for the alpha transfer
-                this._opacityModifyRGB = false;
+            // Set a compatible default for the alpha transfer
+            this._opacityModifyRGB = false;
 
-                // texture
-                // Try to get the texture from the cache
-                var textureName = locValueForKey("textureFileName", dictionary);
-                var imgPath = cc.path.changeBasename(this._plistFile, textureName);
-                var tex = cc.textureCache.getTextureForKey(imgPath);
+            // texture
+            // Try to get the texture from the cache
+            var textureName = locValueForKey("textureFileName", dictionary);
+            var imgPath = cc.path.changeBasename(this._plistFile, textureName);
+            var tex = cc.textureCache.getTextureForKey(imgPath);
 
-                if (tex) {
+            if (tex) {
+                this.setTexture(tex);
+            } else {
+                var textureData = locValueForKey("textureImageData", dictionary);
+
+                if (!textureData || textureData.length === 0) {
+                    tex = cc.textureCache.addImage(imgPath);
+                    if (!tex)
+                        return false;
                     this.setTexture(tex);
                 } else {
-                    var textureData = locValueForKey("textureImageData", dictionary);
-
-                    if (!textureData || textureData.length === 0) {
-                        tex = cc.textureCache.addImage(imgPath);
-                        if (!tex)
-                            return false;
-                        this.setTexture(tex);
-                    } else {
-                        buffer = cc.Codec.unzipBase64AsArray(textureData, 1);
-                        if (!buffer) {
-                            cc.logID(6010);
-                            return false;
-                        }
-
-                        var imageFormat = cc.getImageFormatByData(buffer);
-
-                        if(imageFormat !== cc.ImageFormat.TIFF && imageFormat !== cc.ImageFormat.PNG){
-                            cc.logID(6011);
-                            return false;
-                        }
-
-                        var canvasObj = document.createElement("canvas");
-                        if(imageFormat === cc.ImageFormat.PNG){
-                            var myPngObj = new PNGReader(buffer);
-                            myPngObj.render(canvasObj);
-                        } else {
-                            tiffReader.parseTIFF(buffer,canvasObj);
-                        }
-
-                        cc.textureCache.cacheImage(imgPath, canvasObj);
-
-                        var addTexture = cc.textureCache.getTextureForKey(imgPath);
-                        if(!addTexture)
-                            cc.logID(6012);
-                        this.setTexture(addTexture);
+                    buffer = cc.Codec.unzipBase64AsArray(textureData, 1);
+                    if (!buffer) {
+                        cc.logID(6010);
+                        return false;
                     }
+
+                    var imageFormat = cc.getImageFormatByData(buffer);
+
+                    if(imageFormat !== cc.ImageFormat.TIFF && imageFormat !== cc.ImageFormat.PNG){
+                        cc.logID(6011);
+                        return false;
+                    }
+
+                    var canvasObj = document.createElement("canvas");
+                    if(imageFormat === cc.ImageFormat.PNG){
+                        var myPngObj = new PNGReader(buffer);
+                        myPngObj.render(canvasObj);
+                    } else {
+                        tiffReader.parseTIFF(buffer,canvasObj);
+                    }
+
+                    cc.textureCache.cacheImage(imgPath, canvasObj);
+
+                    var addTexture = cc.textureCache.getTextureForKey(imgPath);
+                    if(!addTexture)
+                        cc.logID(6012);
+                    this.setTexture(addTexture);
                 }
             }
             ret = true;
@@ -1435,21 +1334,17 @@ _ccsg.ParticleSystem = _ccsg.Node.extend({
     initWithTotalParticles:function (numberOfParticles) {
         this._totalParticles = numberOfParticles;
 
-        var i, locParticles = this._particles;
-        locParticles.length = 0;
-        for(i = 0; i< numberOfParticles; i++){
-            locParticles[i] = new cc.Particle();
-        }
-
+        var locParticles = this._particles;
         if (!locParticles) {
             cc.logID(6013);
             return false;
         }
-        this._allocatedParticles = numberOfParticles;
+        locParticles.length = numberOfParticles;
+        for(var i = 0; i < numberOfParticles; i++){
+            locParticles[i] = new cc.Particle();
+        }
 
-        if (this._batchNode)
-            for (i = 0; i < this._totalParticles; i++)
-                locParticles[i].atlasIndex = i;
+        this._allocatedParticles = numberOfParticles;
 
         // default, active
         this._isActive = true;
@@ -1469,24 +1364,12 @@ _ccsg.ParticleSystem = _ccsg.Node.extend({
         //  colorModulate = YES;
         this.autoRemoveOnFinish = false;
 
-        //for batchNode
-        this._transformSystemDirty = false;
-
         // udpate after action in run!
         this.scheduleUpdateWithPriority(1);
         this._renderCmd._initWithTotalParticles(numberOfParticles);
         return true;
     },
-
-    /**
-     * Unschedules the "update" method.
-     * @function
-     * @see scheduleUpdate();
-     */
-    destroyParticleSystem:function () {
-        this.unscheduleUpdate();
-    },
-
+    
     /**
      * Add a particle to the emitter
      * @return {Boolean}
@@ -1673,6 +1556,7 @@ _ccsg.ParticleSystem = _ccsg.Node.extend({
         }
         this._particleIdx = 0;
 
+        var worldToNodeTransform = this.getWorldToNodeTransform();
         var currentPosition = cc.Particle.TemporaryPoints[0];
         if (this.positionType === _ccsg.ParticleSystem.Type.FREE) {
             cc.pIn(currentPosition, this.convertToWorldSpace(this._pointZeroForParticle));
@@ -1760,9 +1644,12 @@ _ccsg.ParticleSystem = _ccsg.Node.extend({
                     //
                     var newPos = tpa;
                     if (this.positionType === _ccsg.ParticleSystem.Type.FREE || this.positionType === _ccsg.ParticleSystem.Type.RELATIVE) {
-                        var diff = tpb;
-                        cc.pIn(diff, currentPosition);
-                        cc.pSubIn(diff, selParticle.startPos);
+                        var diff = tpb, localStartPos = tpc;
+                        // current Position convert To Node Space
+                        cc._pointApplyAffineTransformIn(currentPosition, worldToNodeTransform, diff);
+                        // start Position convert To Node Space
+                        cc._pointApplyAffineTransformIn(selParticle.startPos, worldToNodeTransform, localStartPos);
+                        cc.pSubIn(diff, localStartPos);
 
                         cc.pIn(newPos, selParticle.pos);
                         cc.pSubIn(newPos, diff);
@@ -1770,29 +1657,16 @@ _ccsg.ParticleSystem = _ccsg.Node.extend({
                         cc.pIn(newPos, selParticle.pos);
                     }
 
-                    // translate newPos to correct position, since matrix transform isn't performed in batchnode
-                    // don't update the particle with the new position information, it will interfere with the radius and tangential calculations
-                    if (this._batchNode) {
-                        newPos.x += this._position.x;
-                        newPos.y += this._position.y;
-                    }
                     this._renderCmd.updateParticlePosition(selParticle, newPos);
 
                     // update particle counter
                     ++this._particleIdx;
                 } else {
                     // life < 0
-                    var currentIndex = selParticle.atlasIndex;
-                    if(this._particleIdx !== this.particleCount -1){
+                    if (this._particleIdx !== this.particleCount -1){
                          var deadParticle = locParticles[this._particleIdx];
                         locParticles[this._particleIdx] = locParticles[this.particleCount -1];
                         locParticles[this.particleCount -1] = deadParticle;
-                    }
-                    if (this._batchNode) {
-                        //disable the switched particle
-                        this._batchNode.disableParticle(this.atlasIndex + currentIndex);
-                        //switch indexes
-                        locParticles[this.particleCount - 1].atlasIndex = currentIndex;
                     }
 
                     --this.particleCount;
@@ -1805,11 +1679,9 @@ _ccsg.ParticleSystem = _ccsg.Node.extend({
                 }
             }
             this._renderCmd.updateLocalBB && this._renderCmd.updateLocalBB();
-            this._transformSystemDirty = false;
         }
 
-        if (!this._batchNode)
-            this.postStep();
+        this.postStep();
     },
 
     /**
@@ -1835,11 +1707,6 @@ _ccsg.ParticleSystem = _ccsg.Node.extend({
     },
 
     _updateBlendFunc:function () {
-        if(this._batchNode){
-            cc.logID(6014);
-            return;
-        }
-
         var locTexture = this._texture;
         if (locTexture && locTexture instanceof cc.Texture2D) {
             this._opacityModifyRGB = false;
@@ -1942,16 +1809,13 @@ _ccsg.ParticleSystem = _ccsg.Node.extend({
             // emission Rate
             retParticle.setEmissionRate(this.getEmissionRate());
 
-            //don't get the internal texture if a batchNode is used
-            if (!this.getBatchNode()) {
-                // Set a compatible default for the alpha transfer
-                retParticle.setOpacityModifyRGB(this.isOpacityModifyRGB());
-                // texture
-                var texture = this.getTexture();
-                if(texture){
-                    var size = texture.getContentSize();
-                    retParticle.setTextureWithRect(texture, cc.rect(0, 0, size.width, size.height));
-                }
+            // Set a compatible default for the alpha transfer
+            retParticle.setOpacityModifyRGB(this.isOpacityModifyRGB());
+            // texture
+            var texture = this.getTexture();
+            if(texture){
+                var size = texture.getContentSize();
+                retParticle.setTextureWithRect(texture, cc.rect(0, 0, size.width, size.height));
             }
         }
         return retParticle;
@@ -2006,15 +1870,6 @@ var _p = _ccsg.ParticleSystem.prototype;
 /** @expose */
 _p.opacityModifyRGB;
 cc.defineGetterSetter(_p, "opacityModifyRGB", _p.isOpacityModifyRGB, _p.setOpacityModifyRGB);
-/** @expose */
-_p.batchNode;
-cc.defineGetterSetter(_p, "batchNode", _p.getBatchNode, _p.setBatchNode);
-/** @expose */
-_p.drawMode;
-cc.defineGetterSetter(_p, "drawMode", _p.getDrawMode, _p.setDrawMode);
-/** @expose */
-_p.shapeType;
-cc.defineGetterSetter(_p, "shapeType", _p.getShapeType, _p.setShapeType);
 /** @expose */
 _p.active;
 cc.defineGetterSetter(_p, "active", _p.isActive);
@@ -2146,34 +2001,6 @@ _ccsg.ParticleSystem.ModeB = function (startRadius, startRadiusVar, endRadius, e
 };
 
 /**
- * Shape Mode of Particle Draw
- * @constant
- * @type Number
- */
-_ccsg.ParticleSystem.SHAPE_MODE = 0;
-
-/**
- * Texture Mode of Particle Draw
- * @constant
- * @type Number
- */
-_ccsg.ParticleSystem.TEXTURE_MODE = 1;
-
-/**
- * Star Shape for ShapeMode of Particle
- * @constant
- * @type Number
- */
-_ccsg.ParticleSystem.STAR_SHAPE = 0;
-
-/**
- * Ball Shape for ShapeMode of Particle
- * @constant
- * @type Number
- */
-_ccsg.ParticleSystem.BALL_SHAPE = 1;
-
-/**
  * The Particle emitter lives forever
  * @constant
  * @type Number
@@ -2227,21 +2054,4 @@ _ccsg.ParticleSystem.Type = cc.Enum({
      * Living particles are attached to the emitter and are translated along with it.
      */
     GROUPED: 2
-});
-
-// fireball#2856
-
-var particleSystemPro = _ccsg.ParticleSystem.prototype;
-Object.defineProperty(particleSystemPro, 'visible', {
-    get: _ccsg.Node.prototype.isVisible,
-    set: particleSystemPro.setVisible
-});
-
-Object.defineProperty(particleSystemPro, 'ignoreAnchor', {
-    get: _ccsg.Node.prototype.isIgnoreAnchorPointForPosition,
-    set: particleSystemPro.ignoreAnchorPointForPosition
-});
-
-Object.defineProperty(particleSystemPro, 'opacityModifyRGB', {
-    get: particleSystemPro.isOpacityModifyRGB
 });

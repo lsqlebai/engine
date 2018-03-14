@@ -24,17 +24,24 @@
  ****************************************************************************/
 
 var Path = require('../utils/CCPath');
-var Sys = require('../platform/CCSys');
+var sys = require('../platform/CCSys');
 var Pipeline = require('./pipeline');
 var audioEngine = require('../../audio/CCAudioEngine');
 
-var __audioSupport = Sys.__audioSupport;
+var __audioSupport = sys.__audioSupport;
 var formatSupport = __audioSupport.format;
 var context = __audioSupport.context;
 
 function loadDomAudio (item, callback) {
     var dom = document.createElement('audio');
     dom.src = item.url;
+
+    if (sys.platform === sys.WECHAT_GAME) {
+        item.element = dom;
+        callback(null, item.url);
+        return;
+    }
+
     var clearEvent = function () {
         clearTimeout(timer);
         dom.removeEventListener("canplaythrough", success, false);
@@ -66,7 +73,7 @@ function loadDomAudio (item, callback) {
 }
 
 function loadWebAudio (item, callback) {
-    if (!context) return;
+    if (!context) callback(new Error('Audio Downloader: no web audio context.'));
 
     var request = cc.loader.getXMLHttpRequest();
     request.open("GET", item.url, true);
@@ -93,17 +100,18 @@ function loadWebAudio (item, callback) {
 
 function downloadAudio (item, callback) {
     if (formatSupport.length === 0) {
-        return callback( new Error('Audio Downloader: audio not supported on this browser!') );
+        return new Error('Audio Downloader: audio not supported on this browser!');
     }
 
     item.content = item.url;
 
     // If WebAudio is not supported, load using DOM mode
     if (!__audioSupport.WEB_AUDIO || (item.urlParam && item.urlParam['useDom'])) {
-        return loadDomAudio(item, callback);
+        loadDomAudio(item, callback);
     }
-
-    return loadWebAudio(item, callback);
+    else {
+        loadWebAudio(item, callback);
+    }
 }
 
 module.exports = downloadAudio;

@@ -128,18 +128,37 @@ cc.rendererWebGL = {
     _cacheToBufferCmds: {},                              // an array saves the renderer commands need for cache to other canvas
     _cacheInstanceIds: [],
     _currentID: 0,
-    _clearColor: {r: 0, g: 0, b: 0, a: 255},              //background color,default BLACK
+    _clearColor: {r: 0, g: 0, b: 0, a: 1},              //background color,default BLACK
 
     init: function () {
         var gl = cc._renderContext;
         gl.disable(gl.CULL_FACE);
         gl.disable(gl.DEPTH_TEST);
+        this._initExtensions([
+            'OES_element_index_uint'
+        ]);
 
         this.mat4Identity = new cc.math.Matrix4();
         this.mat4Identity.identity();
         initQuadBuffer(cc.macro.BATCH_VERTEX_COUNT);
         if (cc.sys.os === cc.sys.OS_IOS) {
             _IS_IOS = true;
+        }
+    },
+
+    _initExtensions: function (extensions) {
+        this._extensions = this._extensions || {};
+        for (var i = 0; i < extensions.length; ++i) {
+            var name = extensions[i];
+      
+            try {
+                var ext = gl.getExtension(name);
+                if (ext) {
+                    this._extensions[name] = ext;
+                }
+            } catch (e) {
+                cc.error(e);
+            }
         }
     },
 
@@ -268,9 +287,7 @@ cc.rendererWebGL = {
             if (cmdList.indexOf(cmd) === -1)
                 cmdList.push(cmd);
         } else {
-            if (this._renderCmds.indexOf(cmd) === -1) {
-                this._renderCmds.push(cmd);
-            }
+            this._renderCmds.push(cmd);
         }
     },
 
@@ -313,17 +330,22 @@ cc.rendererWebGL = {
     },
 
     _updateBatchedInfo: function (texture, blendFunc, shaderProgram) {
-        if (texture) {
+        if (texture !== _batchedInfo.texture ||
+            blendFunc.src !== _batchedInfo.blendSrc ||
+            blendFunc.dst !== _batchedInfo.blendDst ||
+            shaderProgram !== _batchedInfo.shader) {
+            // Draw batched elements
+            this._batchRendering();
+            // Update _batchedInfo
             _batchedInfo.texture = texture;
-        }
-
-        if (blendFunc) {
             _batchedInfo.blendSrc = blendFunc.src;
             _batchedInfo.blendDst = blendFunc.dst;
-        }
-
-        if (shaderProgram) {
             _batchedInfo.shader = shaderProgram;
+
+            return true;
+        }
+        else {
+            return false;
         }
     },
 
@@ -463,9 +485,10 @@ cc.rendererWebGL = {
             i, len, cmd,
             context = ctx || cc._renderContext;
 
-        // Reset buffer for rendering
+        // Reset buffer and texture for rendering
         context.bindBuffer(context.ARRAY_BUFFER, null);
-
+        cc.gl.bindTexture2DN(0, null);
+        
         for (i = 0, len = locCmds.length; i < len; ++i) {
             cmd = locCmds[i];
             if (!cmd._needDraw) continue;

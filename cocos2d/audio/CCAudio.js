@@ -25,6 +25,7 @@
  ****************************************************************************/
 
 var EventTarget = require('../core/event/event-target');
+var sys = require('../core/platform/CCSys');
 
 var touchBinded = false;
 var touchPlayList = [
@@ -85,8 +86,17 @@ Audio.State = {
 (function (proto) {
 
     proto.preload = function () {
-        var src = this._src,
-            audio = this;
+        var src = this._src, audio = this;
+
+        if (!src) {
+            this._src = '';
+            this._audioType = Audio.Type.UNKNOWN;
+            this._element = null;
+            this._state = Audio.State.INITIALZING;
+            this._loaded = false;
+            return;
+        }
+
         var item = cc.loader.getItem(src);
 
         if (!item) {
@@ -94,7 +104,7 @@ Audio.State = {
         }
 
         // If the resource does not exist
-        if (!item) {
+        if (!item || !item.complete) {
             return cc.loader.load(src, function (error) {
                 if (!error) {
                     var item = cc.loader.getItem(src);
@@ -102,7 +112,7 @@ Audio.State = {
                     audio.emit('load');
                 }
             });
-        } else if (item.complete) {
+        } else {
             audio.mount(item.element || item.buffer);
             audio.emit('load');
         }
@@ -128,7 +138,7 @@ Audio.State = {
     };
 
     proto.mount = function (elem) {
-        if (elem instanceof HTMLElement) {
+        if (sys.platform === sys.WECHAT_GAME || elem instanceof HTMLElement) {
             this._element = document.createElement('audio');
             this._element.src = elem.src;
             this._audioType = Audio.Type.DOM;
@@ -136,18 +146,20 @@ Audio.State = {
             this._element = new WebAudioElement(elem, this);
             this._audioType = Audio.Type.WEBAUDIO;
         }
-        this._bindEnded();
         this._state = Audio.State.INITIALZING;
         this._loaded = true;
     };
 
     proto.play = function () {
         if (!this._element) return;
+        this._bindEnded();
         this._element.play();
         this.emit('play');
         this._state = Audio.State.PLAYING;
 
-        if (this._audioType === Audio.Type.DOM && this._element.paused) {
+        if (sys.platform !== sys.WECHAT_GAME && 
+            this._audioType === Audio.Type.DOM && 
+            this._element.paused) {
             touchPlayList.push({ instance: this, offset: 0, audio: this._element });
         }
 
@@ -186,13 +198,13 @@ Audio.State = {
         } catch (error) {}
         this._element.pause();
         // remove touchPlayList
-        for (var i=0; i<touchPlayList; i++) {
+        for (var i=0; i<touchPlayList.length; i++) {
             if (touchPlayList[i].instance === this) {
                 touchPlayList.splice(i, 1);
                 break;
             }
         }
-        this.emit('ended');
+        this._unbindEnded();
         this.emit('stop');
         this._state = Audio.State.PAUSED;
     };
@@ -216,10 +228,23 @@ Audio.State = {
     proto.setCurrentTime = function (num) {
         if (!this._element) return;
         this._unbindEnded();
-        this._bindEnded(function () {
-            this._bindEnded();
-        }.bind(this));
-        this._element.currentTime = num;
+        if (sys.platform !== sys.WECHAT_GAME) {
+            this._bindEnded(function () {
+                this._bindEnded();
+            }.bind(this));
+        }
+        try {
+            this._element.currentTime = num;
+        } catch (err) {
+            var _element = this._element;
+            if (_element.addEventListener) {
+                var func = function () {
+                    _element.removeEventListener('loadedmetadata', func);
+                    _element.currentTime = num;
+                };
+                _element.addEventListener('loadedmetadata', func);
+            }
+        }
     };
     proto.getCurrentTime = function () {
         return this._element ? this._element.currentTime : 0;
@@ -255,11 +280,19 @@ Audio.State = {
 // Encapsulated WebAudio interface
 var WebAudioElement = function (buffer, audio) {
     this._audio = audio;
-    this._context = cc.sys.__audioSupport.context;
+    this._context = sys.__audioSupport.context;
     this._buffer = buffer;
-    this._volume = this._context['createGain']();
-    this._volume['gain'].value = 1;
-    this._volume['connect'](this._context['destination']);
+
+    this._gainObj = this._context['createGain']();
+    this._volume = 1;
+    // https://www.chromestatus.com/features/5287995770929152
+    if (this._gainObj['gain'].setTargetAtTime) {
+        this._gainObj['gain'].setTargetAtTime(this._volume, this._context.currentTime, 0.01);
+    } else {
+        this._gainObj['gain'].value = 1;
+    }
+    this._gainObj['connect'](this._context['destination']);
+
     this._loop = false;
     // The time stamp on the audio time axis when the recording begins to play.
     this._startTime = -1;
@@ -288,7 +321,7 @@ var WebAudioElement = function (buffer, audio) {
 
         var audio = this._context["createBufferSource"]();
         audio.buffer = this._buffer;
-        audio["connect"](this._volume);
+        audio["connect"](this._gainObj);
         audio.loop = this._loop;
 
         this._startTime = this._context.currentTime;
@@ -321,13 +354,13 @@ var WebAudioElement = function (buffer, audio) {
 
         audio.onended = this._endCallback;
 
-        // If the current audio context time stamp is 0
+        // If the current audio context time stamp is 0 and audio context state is suspended
         // There may be a need to touch events before you can actually start playing audio
-        if (this._context.currentTime === 0) {
+        if ((!audio.context.state || audio.context.state === "suspended") && this._context.currentTime === 0) {
             var self = this;
             clearTimeout(this._currextTimer);
             this._currextTimer = setTimeout(function () {
-                if (self._context.currentTime === 0) {
+                if (sys.platform !== sys.WECHAT_GAME && self._context.currentTime === 0) {
                     touchPlayList.push({
                         instance: self._audio,
                         offset: offset,
@@ -373,10 +406,17 @@ var WebAudioElement = function (buffer, audio) {
         return this._loop = bool;
     });
 
-    proto.__defineGetter__('volume', function () { return this._volume['gain'].value; });
+    proto.__defineGetter__('volume', function () {
+        return this._volume;
+    });
     proto.__defineSetter__('volume', function (num) {
-        this._volume['gain'].value = num;
-        if (cc.sys.os === cc.sys.OS_IOS && !this.paused && this._currentSource) {
+        this._volume = num;
+        if (this._gainObj['gain'].setTargetAtTime) {
+            this._gainObj['gain'].setTargetAtTime(this._volume, this._context.currentTime, 0.01);
+        } else {
+            this._volume['gain'].value = num;
+        }
+        if (sys.os === sys.OS_IOS && !this.paused && this._currentSource) {
             // IOS must be stop webAudio
             this._currentSource.onended = null;
             this.pause();

@@ -25,6 +25,8 @@
 
 require('./js');
 require('./CCClass');
+require('./CCClassDecorator');
+require('./CCEnum');
 require('./CCObject');
 require('./callbacks-invoker');
 require('./url');
@@ -35,11 +37,9 @@ require('./requiring-frame');
 require('./CCSys');
 require('./CCMacro');
 
-if (CC_JSB || cc.sys.isBrowser) {
+if (!(CC_EDITOR && Editor.isMainProcess)) {
     require('./CCAssetLibrary');
-}
-
-if (!CC_JSB && !(CC_EDITOR && Editor.isMainProcess)) {
-    require('./miniFramework');
-    require('./CCVisibleRect');
+    if (!CC_JSB) {
+        require('./CCVisibleRect');
+    }
 }

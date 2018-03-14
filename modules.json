@@ -45,19 +45,22 @@
   {
     "name": "ParticleSystem",
     "entries": [
-      "./cocos2d/particle/CCParticleSystem.js"
+      "./cocos2d/particle/CCParticleSystem.js",
+      "./cocos2d/particle/CCParticleAsset.js"
     ]
   },
   {
     "name": "TiledMap",
     "entries": [
-      "./cocos2d/tilemap/CCTiledMap.js"
+      "./cocos2d/tilemap/CCTiledMap.js",
+      "./cocos2d/tilemap/CCTiledMapAsset.js"
     ]
   },
   {
     "name": "Spine Skeleton",
     "entries": [
-      "./extensions/spine/index.js"
+      "./extensions/spine/index.js",
+      "./jsb/jsb-spine.js"
     ]
   },
   {
@@ -93,13 +96,9 @@
   {
     "name": "Toggle",
     "entries": [
-      "./cocos2d/core/components/CCToggle.js"
-    ]
-  },
-  {
-    "name": "ToggleGroup",
-    "entries": [
-      "./cocos2d/core/components/CCToggleGroup.js"
+      "./cocos2d/core/components/CCToggle.js",
+      "./cocos2d/core/components/CCToggleGroup.js",
+      "./cocos2d/core/components/CCToggleContainer.js"
     ]
   },
   {
@@ -129,26 +128,35 @@
   {
     "name": "EditorBox",
     "entries": [
-      "./cocos2d/core/components/CCEditBox.js"
+      "./cocos2d/core/components/CCEditBox.js",
+      "./jsb/jsb-editbox.js"
     ]
   },
   {
     "name": "VideoPlayer",
     "entries": [
-      "./cocos2d/core/components/CCVideoPlayer.js"
+      "./cocos2d/core/components/CCVideoPlayer.js",
+      "./jsb/jsb-videoplayer.js"
+    ]
+  },
+  {
+    "name": "WebView",
+    "entries": [
+      "./cocos2d/core/components/CCWebView.js",
+      "./jsb/jsb-webview.js"
     ]
   },
   {
     "name": "RichText",
     "entries": [
-      "./cocos2d/core/label/CCHtmlTextParser.js",
       "./cocos2d/core/components/CCRichText.js"
     ]
   },
   {
     "name": "AudioSource",
     "entries": [
-      "./cocos2d/core/components/CCAudioSource.js"
+      "./cocos2d/core/components/CCAudioSource.js",
+      "./jsb/jsb-audio.js"
     ]
   },
   {
@@ -191,8 +199,17 @@
   {
     "name": "DragonBones",
     "entries": [
-      "./extensions/dragonbones/index.js"
+      "./extensions/dragonbones/index.js",
+      "./jsb/jsb-dragonbones.js"
     ]
+  },
+  {
+    "name": "Physics",
+    "entries": [
+      "./cocos2d/core/physics/index.js",
+      "./jsb/jsb-box2d.js"
+    ],
+    "dependencies": ["Collider"]
   },
   {
     "name": "StudioComponent",
@@ -200,6 +217,36 @@
       "./cocos2d/core/components/CCStudioComponent.js"
     ]
   },
+  {
+    "name": "RenderTexture",
+    "entries": [
+      "./cocos2d/render-texture/CCRenderTexture.js",
+      "./cocos2d/render-texture/CCRenderTextureCanvasRenderCmd.js",
+      "./cocos2d/render-texture/CCRenderTextureWebGLRenderCmd.js"
+    ]
+  },
+  {
+    "name": "Chipmunk",
+    "entries": [
+      "./external/chipmunk/chipmunk.js"
+    ]
+  },
+  {
+    "name": "Camera",
+    "entries": [
+      "./cocos2d/core/camera/CCCamera.js"
+    ]
+  },
+  {
+    "name": "Intersection",
+    "entries": [
+      "./cocos2d/core/collider/CCIntersection.js"
+    ]
+  },
+  {
+    "name": "Native NetWork"
+  }
+,
     {
         "name": "Custom",
         "entries": [

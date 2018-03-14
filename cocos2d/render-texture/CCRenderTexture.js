@@ -80,11 +80,11 @@ cc.RenderTexture = _ccsg.Node.extend(/** @lends cc.RenderTexture# */{
         _ccsg.Node.prototype.ctor.call(this);
         this._cascadeColorEnabled = true;
         this._cascadeOpacityEnabled = true;
-        this._pixelFormat = cc.Texture2D.PIXEL_FORMAT_RGBA8888;
+        this._pixelFormat = cc.Texture2D.PixelFormat.RGBA8888;
         this._clearColor = new cc.Color(0, 0, 0, 255);
 
         if (width !== undefined && height !== undefined) {
-            format = format || cc.Texture2D.PIXEL_FORMAT_RGBA8888;
+            format = format || cc.Texture2D.PixelFormat.RGBA8888;
             depthStencilFormat = depthStencilFormat || 0;
             this.initWithWidthAndHeight(width, height, format, depthStencilFormat);
         }
@@ -99,13 +99,17 @@ cc.RenderTexture = _ccsg.Node.extend(/** @lends cc.RenderTexture# */{
     },
 
     visit: function (parent) {
+        var cmd = this._renderCmd, parentCmd = parent ? parent._renderCmd : null;
+
         // quick return if not visible
-        if (!this._visible)
+        if (!this._visible) {
+            cmd._propagateFlagsDown(parentCmd);
             return;
+        }
 
-        var renderer = cc.renderer, cmd = this._renderCmd;
+        var renderer = cc.renderer;
 
-        cmd.visit(parent && parent._renderCmd);
+        cmd.visit(parentCmd);
         renderer.pushRenderCommand(cmd);
         this.sprite.visit(this);
         cmd._dirtyFlag = 0;

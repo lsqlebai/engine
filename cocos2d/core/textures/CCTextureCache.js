@@ -29,27 +29,14 @@ var Texture2D = require('./CCTexture2D');
 /**
  * cc.textureCache is a singleton object, it's the global cache for cc.Texture2D
  * @class textureCache
+ * @static
  */
 var textureCache = /** @lends cc.textureCache# */{
     _textures: {},
     _textureColorsCache: {},
     _textureKeySeq: (0 | Math.random() * 1000),
 
-    _loadedTexturesBefore: {},
-
     handleLoadedTexture: null,
-
-    _initializingRenderer: function () {
-        var selPath;
-        //init texture from _loadedTexturesBefore
-        var locLoadedTexturesBefore = this._loadedTexturesBefore, locTextures = this._textures;
-        for (selPath in locLoadedTexturesBefore) {
-            var tex2d = locLoadedTexturesBefore[selPath];
-            tex2d.handleLoadedTexture();
-            locTextures[selPath] = tex2d;
-        }
-        this._loadedTexturesBefore = {};
-    },
 
     /**
      * Description
@@ -86,7 +73,7 @@ var textureCache = /** @lends cc.textureCache# */{
 
     /*
      * @method getKeyByTexture
-     * @param {Image} texture
+     * @param {HTMLImageElement} texture
      * @return {String|Null}
      * @example {@link utils/api/engine/docs/cocos2d/core/textures/getKeyByTexture.js}
      */
@@ -105,12 +92,12 @@ var textureCache = /** @lends cc.textureCache# */{
 
     /**
      * @method getTextureColors
-     * @param {Image} texture
+     * @param {HTMLImageElement} texture
      * @return {Array}
      * @example {@link utils/api/engine/docs/cocos2d/core/textures/getTextureColors.js}
      */
     getTextureColors: function (texture) {
-        var image = texture._htmlElementObj;
+        var image = texture._image;
         var key = this.getKeyByTexture(image);
         if (!key) {
             if (image instanceof HTMLImageElement)
@@ -125,8 +112,8 @@ var textureCache = /** @lends cc.textureCache# */{
     },
 
     /**
-     * #en get all textures
-     * #zh 获取所有贴图
+     * !#en get all textures
+     * !#zh 获取所有贴图
      * @method getAllTextures
      * @return {Texture2D[]}
      */
@@ -160,7 +147,7 @@ var textureCache = /** @lends cc.textureCache# */{
     /**
      * Deletes a texture from the cache given a texture.
      * @method removeTexture
-     * @param {Image} texture
+     * @param {HTMLImageElement} texture
      * @example {@link utils/api/engine/docs/cocos2d/core/textures/removeTexture.js}
      */
     removeTexture: function (texture) {
@@ -212,7 +199,7 @@ var textureCache = /** @lends cc.textureCache# */{
      * Cache the image data.
      * @method cacheImage
      * @param {String} path
-     * @param {Image|HTMLImageElement|HTMLCanvasElement} texture
+     * @param {HTMLImageElement|HTMLCanvasElement} texture
      */
     cacheImage: function (path, texture) {
         cc.assertID(path, 3009);
@@ -225,34 +212,6 @@ var textureCache = /** @lends cc.textureCache# */{
         texture2d.initWithElement(texture);
         texture2d.handleLoadedTexture();
         this._textures[path] = texture2d;
-    },
-
-    /**
-     * <p>Returns a Texture2D object given an UIImage image<br />
-     * If the image was not previously loaded, it will create a new Texture2D object and it will return it.<br />
-     * Otherwise it will return a reference of a previously loaded image<br />
-     * The "key" parameter will be used as the "key" for the cache.<br />
-     * If "key" is null, then a new texture will be created each time.</p>
-     * @method addUIImage
-     * @param {HTMLImageElement|HTMLCanvasElement} image
-     * @param {String} key
-     * @return {Texture2D}
-     */
-    addUIImage: function (image, key) {
-        cc.assertID(image, 3008);
-
-        if (key && this._textures[key]) {
-            return this._textures[key];
-        }
-
-        // prevents overloading the autorelease pool
-        var texture = new Texture2D();
-        texture.initWithImage(image);
-        if (key != null)
-            this._textures[key] = texture;
-        else
-            cc.logID(3004);
-        return texture;
     },
 
     /**
@@ -292,7 +251,6 @@ var textureCache = /** @lends cc.textureCache# */{
         this._textures = {};
         this._textureColorsCache = {};
         this._textureKeySeq = (0 | Math.random() * 1000);
-        this._loadedTexturesBefore = {};
     }
 };
 
@@ -353,28 +311,19 @@ game.once(game.EVENT_RENDERER_INITED, function () {
         
         _p.handleLoadedTexture = function (url) {
             var locTexs = this._textures, tex, premultiplied;
-            //remove judge(webgl)
-            if (!cc.game._rendererInitialized) {
-                locTexs = this._loadedTexturesBefore;
-            }
             tex = locTexs[url];
             if (!tex) {
                 cc.assertID(url, 3009);
                 tex = locTexs[url] = new Texture2D();
                 tex.url = url;
             }
-            premultiplied = cc.macro.AUTO_PREMULTIPLIED_ALPHA_FOR_PNG && (cc.path.extname(url) === ".png");
-            tex.handleLoadedTexture(premultiplied);
+            tex.handleLoadedTexture();
         };
 
         _p.addImage = function (url, cb, target) {
             cc.assertID(url, 3112);
 
             var locTexs = this._textures;
-            //remove judge(webgl)
-            if (!cc.game._rendererInitialized) {
-                locTexs = this._loadedTexturesBefore;
-            }
             var tex = locTexs[url];
             if (tex) {
                 if(tex.isLoaded()) {

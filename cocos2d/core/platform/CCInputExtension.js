@@ -23,7 +23,14 @@
  THE SOFTWARE.
  ****************************************************************************/
 
+if (!cc.ClassManager) {
+    require("./_CCClass");
+}
+
+var eventManager = require('../event-manager');
 var inputManager = require("./CCInputManager");
+
+inputManager.__instanceId = cc.ClassManager.getNewInstanceId();
 
 /**
  * whether enable accelerometer event
@@ -59,12 +66,12 @@ inputManager.setAccelerometerInterval = function(interval){
 
 inputManager._registerKeyboardEvent = function(){
     cc.game.canvas.addEventListener("keydown", function (e) {
-        cc.eventManager.dispatchEvent(new cc.Event.EventKeyboard(e.keyCode, true));
+        eventManager.dispatchEvent(new cc.Event.EventKeyboard(e.keyCode, true));
         e.stopPropagation();
         e.preventDefault();
     }, false);
     cc.game.canvas.addEventListener("keyup", function (e) {
-        cc.eventManager.dispatchEvent(new cc.Event.EventKeyboard(e.keyCode, false));
+        eventManager.dispatchEvent(new cc.Event.EventKeyboard(e.keyCode, false));
         e.stopPropagation();
         e.preventDefault();
     }, false);
@@ -122,6 +129,12 @@ inputManager.didAccelerate = function (eventData) {
         mAcceleration.x = mAcceleration.y;
         mAcceleration.y = -tmpX;
     }else if(w.orientation === cc.macro.WEB_ORIENTATION_PORTRAIT_UPSIDE_DOWN){
+        mAcceleration.x = -mAcceleration.x;
+        mAcceleration.y = -mAcceleration.y;
+    }
+    // fix android acc values are opposite
+    if (!CC_JSB && cc.sys.os === cc.sys.OS_ANDROID &&
+        cc.sys.browserType !== cc.sys.BROWSER_TYPE_MOBILE_QQ) {
         mAcceleration.x = -mAcceleration.x;
         mAcceleration.y = -mAcceleration.y;
     }

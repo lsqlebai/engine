@@ -19,6 +19,10 @@
  THE SOFTWARE.
  ****************************************************************************/
 
+var Utils = require('../platform/utils');
+var sys = require('../platform/CCSys');
+var eventManager = require('../event-manager');
+
 /**
  * @class
  * @extends _ccsg.Node
@@ -138,17 +142,16 @@ _ccsg.VideoPlayer = _ccsg.Node.extend(/** @lends _ccsg.VideoPlayer# */{
         this._renderCmd.updateSize(width, height);
     },
 
-    cleanup: function () {
-        this._super();
-
-        this._renderCmd.removeDom();
-    },
-
     onEnter: function () {
         _ccsg.Node.prototype.onEnter.call(this);
         var list = _ccsg.VideoPlayer.elements;
         if(list.indexOf(this) === -1)
             list.push(this);
+    },
+
+    cleanup: function () {
+        this._super();
+        this._renderCmd.removeDom();
     },
 
     onExit: function () {
@@ -170,7 +173,7 @@ _ccsg.VideoPlayer.elements = [];
 // video 在 game_hide 事件中被自动暂停的队列，用于回复的时候重新开始播放
 _ccsg.VideoPlayer.pauseElements = [];
 
-cc.eventManager.addCustomListener(cc.game.EVENT_HIDE, function () {
+eventManager.addCustomListener(cc.game.EVENT_HIDE, function () {
     var list = _ccsg.VideoPlayer.elements;
     for(var node, i=0; i<list.length; i++){
         node = list[i];
@@ -219,14 +222,16 @@ _ccsg.VideoPlayer.EventType = {
          * so it is best to provide mp4 and webm or ogv file
          */
         var dom = document.createElement("video");
-        if(dom.canPlayType("video/ogg")){
-            video._polyfill.canPlayType.push(".ogg");
-            video._polyfill.canPlayType.push(".ogv");
+        if (sys.platform !== sys.WECHAT_GAME) {
+            if(dom.canPlayType("video/ogg")){
+                video._polyfill.canPlayType.push(".ogg");
+                video._polyfill.canPlayType.push(".ogv");
+            }
+            if(dom.canPlayType("video/mp4"))
+                video._polyfill.canPlayType.push(".mp4");
+            if(dom.canPlayType("video/webm"))
+                video._polyfill.canPlayType.push(".webm");
         }
-        if(dom.canPlayType("video/mp4"))
-            video._polyfill.canPlayType.push(".mp4");
-        if(dom.canPlayType("video/webm"))
-            video._polyfill.canPlayType.push(".webm");
     })();
 
     if(cc.sys.browserType === cc.sys.BROWSER_TYPE_FIREFOX){
@@ -302,6 +307,9 @@ _ccsg.VideoPlayer.EventType = {
     };
 
     proto.updateURL = function (path) {
+        if (cc.loader.md5Pipe) {
+            path = cc.loader.md5Pipe.transformURL(path);
+        }
         var source, video, extname;
         var node = this._node;
 
@@ -386,21 +394,10 @@ _ccsg.VideoPlayer.EventType = {
         var video = this._video;
         if (node.visible) {
             video.style.visibility = 'visible';
-            cc.game.container.appendChild(video);
         } else {
             video.style.visibility = 'hidden';
             video.pause();
             this._playing = false;
-            if(video){
-                var hasChild = false;
-                if('contains' in cc.game.container) {
-                    hasChild = cc.game.container.contains(video);
-                }else {
-                    hasChild = cc.game.container.compareDocumentPosition(video) % 16;
-                }
-                if(hasChild)
-                    cc.game.container.removeChild(video);
-            }
         }
     };
 
@@ -411,6 +408,8 @@ _ccsg.VideoPlayer.EventType = {
         video.style.left = "0px";
         video.className = "cocosVideo";
         video.setAttribute('preload', true);
+        video.setAttribute('webkit-playsinline', '');
+        video.setAttribute('playsinline', '');
         this._video = video;
         cc.game.container.appendChild(video);
     };
@@ -418,12 +417,7 @@ _ccsg.VideoPlayer.EventType = {
     proto.removeDom = function () {
         var video = this._video;
         if(video){
-            var hasChild = false;
-            if('contains' in cc.game.container) {
-                hasChild = cc.game.container.contains(video);
-            }else {
-                hasChild = cc.game.container.compareDocumentPosition(video) % 16;
-            }
+            var hasChild = Utils.contains(cc.game.container, video);
             if(hasChild)
                 cc.game.container.removeChild(video);
         }

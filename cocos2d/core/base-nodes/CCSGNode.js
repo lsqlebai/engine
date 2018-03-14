@@ -24,6 +24,12 @@
  THE SOFTWARE.
  ****************************************************************************/
 
+var Misc = require('../utils/misc');
+var eventManager = require('../event-manager');
+
+var ActionManagerExist = !!cc.ActionManager;
+var emptyFunc = function () {};
+
 /*
  * XXX: Yes, nodes might have a sort problem once every 15 days if the game runs at 60 FPS and each frame sprites are reordered.
  */
@@ -113,7 +119,6 @@ cc.s_globalOrderOfArrival = 1;
  * @property {Boolean}              running             - <@readonly> Indicate whether node is running or not
  * @property {Number}               tag                 - Tag of node
  * @property {Number}               arrivalOrder        - The arrival order, indicates which children is added previously
- * @property {cc.ActionManager}     actionManager       - The CCActionManager object that is used by all actions.
  * @property {cc.GLProgram}         shaderProgram       - The shader program currently used for this node
  * @property {Number}               glServerState       - The state of OpenGL server side
  * @property {cc.Scheduler}         scheduler           - cc.Scheduler used to schedule all "updates" and timers
@@ -149,7 +154,6 @@ _ccsg.Node = cc.Class({
         _ignoreAnchorPointForPosition: false,
         tag: cc.macro.NODE_TAG_INVALID,
 
-        _showNode: false,
         _name: '',                     ///<a string label, an user defined string to identify this node
 
         _realOpacity: 255,
@@ -271,7 +275,7 @@ _ccsg.Node = cc.Class({
             this._parent.reorderChild(this, localZOrder);
         else
             this._localZOrder = localZOrder;
-        cc.eventManager._setDirtyForNode(this);
+        eventManager._setDirtyForNode(this);
     },
 
     //Helper function used by `setLocalZOrder`. Don't use it unless you know what you are doing.
@@ -336,7 +340,7 @@ _ccsg.Node = cc.Class({
     setGlobalZOrder: function (globalZOrder) {
         if (this._globalZOrder !== globalZOrder) {
             this._globalZOrder = globalZOrder;
-            cc.eventManager._setDirtyForNode(this);
+            eventManager._setDirtyForNode(this);
         }
     },
 
@@ -639,9 +643,8 @@ _ccsg.Node = cc.Class({
      * @param {Boolean} visible Pass true to make the node visible, false to hide the node.
      */
     setVisible: function (visible) {
-        if(this._visible !== visible){
+        if (this._visible !== visible) {
             this._visible = visible;
-            //if(visible)
             this._renderCmd.setDirtyFlag(_ccsg.Node._dirtyFlags.transformDirty);
             cc.renderer.childrenOrderDirty = true;
         }
@@ -905,30 +908,6 @@ _ccsg.Node = cc.Class({
     },
 
     /**
-     * <p>Returns the CCActionManager object that is used by all actions.<br/>
-     * (IMPORTANT: If you set a new cc.ActionManager, then previously created actions are going to be removed.)</p>
-     * @function
-     * @see _ccsg.Node#setActionManager
-     * @return {cc.ActionManager} A CCActionManager object.
-     */
-    getActionManager: function () {
-        return this._actionManager || cc.director.getActionManager();
-    },
-
-    /**
-     * <p>Sets the cc.ActionManager object that is used by all actions. </p>
-     * @function
-     * @warning If you set a new CCActionManager, then previously created actions will be removed.
-     * @param {cc.ActionManager} actionManager A CCActionManager object that is used by all actions.
-     */
-    setActionManager: function (actionManager) {
-        if (this._actionManager !== actionManager) {
-            this.stopAllActions();
-            this._actionManager = actionManager;
-        }
-    },
-
-    /**
      * <p>
      *   Returns the cc.Scheduler object used to schedule all "updates" and timers.
      * </p>
@@ -986,7 +965,7 @@ _ccsg.Node = cc.Class({
         this.unscheduleAllCallbacks();
 
         // event
-        cc.eventManager.removeListeners(this);
+        eventManager.removeListeners(this);
     },
 
     // composition: GET
@@ -1437,42 +1416,42 @@ _ccsg.Node = cc.Class({
      * @param {cc.Action} action
      * @return {cc.Action} An Action pointer
      */
-    runAction: function (action) {
+    runAction: ActionManagerExist ? function (action) {
         cc.assertID(action, 1618);
 
-        this.actionManager.addAction(action, this, !this._running);
+        cc.director.getActionManager().addAction(action, this, !this._running);
         return action;
-    },
+    } : emptyFunc,
 
     /**
      * Stops and removes all actions from the running action list .
      * @function
      */
-    stopAllActions: function () {
-        this.actionManager && this.actionManager.removeAllActionsFromTarget(this);
-    },
+    stopAllActions: ActionManagerExist ? function () {
+        cc.director.getActionManager().removeAllActionsFromTarget(this);
+    } : emptyFunc,
 
     /**
      * Stops and removes an action from the running action list.
      * @function
      * @param {cc.Action} action An action object to be removed.
      */
-    stopAction: function (action) {
-        this.actionManager.removeAction(action);
-    },
+    stopAction: ActionManagerExist ? function (action) {
+        cc.director.getActionManager().removeAction(action);
+    } : emptyFunc,
 
     /**
      * Removes an action from the running action list by its tag.
      * @function
      * @param {Number} tag A tag that indicates the action to be removed.
      */
-    stopActionByTag: function (tag) {
+    stopActionByTag: ActionManagerExist ? function (tag) {
         if (tag === cc.Action.TAG_INVALID) {
             cc.logID(1612);
             return;
         }
-        this.actionManager.removeActionByTag(tag, this);
-    },
+        cc.director.getActionManager().removeActionByTag(tag, this);
+    } : emptyFunc,
 
     /**
      * Returns an action from the running action list by its tag.
@@ -1481,12 +1460,14 @@ _ccsg.Node = cc.Class({
      * @param {Number} tag
      * @return {cc.Action} The action object with the given tag.
      */
-    getActionByTag: function (tag) {
+    getActionByTag: ActionManagerExist ? function (tag) {
         if (tag === cc.Action.TAG_INVALID) {
             cc.logID(1613);
             return null;
         }
-        return this.actionManager.getActionByTag(tag, this);
+        return cc.director.getActionManager().getActionByTag(tag, this);
+    } : function () {
+        return null;
     },
 
     /** <p>Returns the numbers of actions that are running plus the ones that are schedule to run (actions in actionsToAdd and actions arrays).<br/>
@@ -1496,8 +1477,10 @@ _ccsg.Node = cc.Class({
      * @function
      * @return {Number} The number of actions that are running plus the ones that are schedule to run
      */
-    getNumberOfRunningActions: function () {
-        return this.actionManager.getNumberOfRunningActionsInTarget(this);
+    getNumberOfRunningActions: ActionManagerExist ? function () {
+        return cc.director.getActionManager().getNumberOfRunningActionsInTarget(this);
+    } : function () {
+        return 0;
     },
 
     // _ccsg.Node - Callbacks
@@ -1663,8 +1646,8 @@ _ccsg.Node = cc.Class({
      */
     resume: function () {
         this.scheduler.resumeTarget(this);
-        this.actionManager && this.actionManager.resumeTarget(this);
-        cc.eventManager.resumeTarget(this);
+        ActionManagerExist && cc.director.getActionManager().resumeTarget(this);
+        eventManager.resumeTarget(this);
     },
 
     /**
@@ -1685,8 +1668,8 @@ _ccsg.Node = cc.Class({
      */
     pause: function () {
         this.scheduler.pauseTarget(this);
-        this.actionManager && this.actionManager.pauseTarget(this);
-        cc.eventManager.pauseTarget(this);
+        ActionManagerExist && cc.director.getActionManager().pauseTarget(this);
+        eventManager.pauseTarget(this);
     },
 
     /**
@@ -1871,12 +1854,16 @@ _ccsg.Node = cc.Class({
      * @param {_ccsg.Node.RenderCmd} parentCmd
      */
     visit: function (parent) {
-        // quick return if not visible
-        if (!this._visible)
-            return;
+        var cmd = this._renderCmd, parentCmd = parent ? parent._renderCmd : null;
 
-        var renderer = cc.renderer, cmd = this._renderCmd;
-        cmd.visit(parent && parent._renderCmd);
+        // quick return if not visible
+        if (!this._visible) {
+            cmd._propagateFlagsDown(parentCmd);
+            return;
+        }
+
+        var renderer = cc.renderer;
+        cmd.visit(parentCmd);
 
         var i, children = this._children, len = children.length, child;
         if (len > 0) {
@@ -2206,6 +2193,22 @@ _ccsg.Node.performType = {
 _ccsg.Node._performStacks = [[]];
 _ccsg.Node._performing = 0;
 
-cc.assertID(typeof cc._tmp.PrototypeCCNode === 'function', 3200, "BaseNodesPropertyDefine.js");
-cc._tmp.PrototypeCCNode();
-delete cc._tmp.PrototypeCCNode;
+
+var SameNameGetSets = ['skewX', 'skewY', 'vertexZ', 'rotation', 'rotationX', 'rotationY', 'scale', 'scaleX', 'scaleY',
+                       'children', 'childrenCount', 'parent', 'scheduler', 'shaderProgram', 'opacity', 'color'];
+var DiffNameGetSets = {
+    x: ['getPositionX', 'setPositionX'],
+    y: ['getPositionY', 'setPositionY'],
+    width: ['_getWidth', '_setWidth'],
+    height: ['_getHeight', '_setHeight'],
+    anchorX: ['_getAnchorX', '_setAnchorX'],
+    anchorY: ['_getAnchorY', '_setAnchorY'],
+    zIndex: ['getLocalZOrder', 'setLocalZOrder'],
+    visible: ['isVisible', 'setVisible'],
+    running: ['isRunning'],
+    ignoreAnchor: ['isIgnoreAnchorPointForPosition', 'setIgnoreAnchorPointForPosition'],
+    opacityModifyRGB: ['isOpacityModifyRGB', 'setOpacityModifyRGB'],
+    cascadeOpacity: ['isCascadeOpacityEnabled', 'setCascadeOpacityEnabled'],
+    cascadeColor: ['isCascadeColorEnabled', 'setCascadeColorEnabled'],
+};
+Misc.propertyDefine(_ccsg.Node, SameNameGetSets, DiffNameGetSets);

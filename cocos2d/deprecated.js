@@ -62,12 +62,6 @@ if (CC_DEV) {
             return typeof obj === 'function';
         };
     });
-    js.get(cc.js, "isFunction", function () {
-        cc.warnID(1400, 'cc.js.isFunction', '"typeof obj === \'function\'"');
-        return function(obj) {
-            return typeof obj === 'function';
-        };
-    });
 
     /**
      * Check the obj whether is number or not
@@ -101,21 +95,9 @@ if (CC_DEV) {
             return Array.isArray(obj);
         };
     });
-    js.get(cc.js, "isArray", function () {
-        cc.warnID(1400, 'cc.js.isArray', '"Array.isArray(obj)"');
-        return function(obj) {
-            return Array.isArray(obj);
-        };
-    });
 
     js.get(cc, "isUndefined", function () {
         cc.warnID(1400, 'cc.isUndefined', '"typeof obj === \'undefined\'"');
-        return function(obj) {
-            return typeof obj === 'undefined';
-        };
-    });
-    js.get(cc.js, "isUndefined", function () {
-        cc.warnID(1400, 'cc.js.isUndefined', '"typeof obj === \'undefined\'"');
         return function(obj) {
             return typeof obj === 'undefined';
         };
@@ -125,13 +107,6 @@ if (CC_DEV) {
         cc.warnID(1400, 'cc.isObject', '"typeof obj === \'object\'"');
         return function(obj) {
             return typeof obj === 'object';
-        };
-    });
-
-    js.get(cc.js, "isObject", function () {
-        cc.warnID(1400, 'cc.js.isObject', '"typeof obj === \'object\'"');
-        return function(obj) {
-            return typeof obj === "object";
         };
     });
 
@@ -252,8 +227,11 @@ if (CC_DEV) {
     });
 
     function deprecateEnum (obj, oldPath, newPath, hasTypePrefixBefore) {
+        if (!CC_SUPPORT_JIT) {
+            return;
+        }
         hasTypePrefixBefore = hasTypePrefixBefore !== false;
-        var enumDef = eval(newPath);
+        var enumDef = Function('return ' + newPath)();
         var entries = cc.Enum.getList(enumDef);
         var delimiter = hasTypePrefixBefore ? '_' : '.';
         for (var i = 0; i < entries.length; i++) {
@@ -326,7 +304,10 @@ if (CC_DEV) {
                             return x.trim();
                         });
                 }
-                js.getset(owner, prop, accessor.bind(null, getset[0]), getset[1] && accessor.bind(null, getset[1]));
+                try {
+                    js.getset(owner, prop, accessor.bind(null, getset[0]), getset[1] && accessor.bind(null, getset[1]));
+                }
+                catch (e) {}
             }
             var getset = obj[prop];
             if (prop[0] === '*') {
@@ -346,6 +327,12 @@ if (CC_DEV) {
             }
         }
     }
+
+    // cc.director
+
+    provideClearError(cc.Director.prototype, {
+        getSecondsPerFrame : 'getDeltaTime'
+    });
 
     // cc.loader
 
@@ -578,6 +565,9 @@ if (CC_DEV) {
             'grid',
             'userData',
             'userObject',
+            'actionManager',
+            'getActionManager',
+            'setActionManager',
             'getNormalizedPosition',
             'setNormalizedPosition',
             'getCamera',
@@ -608,15 +598,22 @@ if (CC_DEV) {
         });
     }
 
+    cc.js.get(cc.Texture2D.prototype, 'getName', function () {
+        cc.warnID(1400, 'texture.getName()', 'texture._glID');
+        return function () {
+            return this._glID || null;
+        };
+    });
+
     //ui
     if (cc.Layout) {
+        js.obsolete(cc.Layout, 'cc.Layout.ResizeType', 'ResizeMode');
         js.obsolete(cc.Layout.prototype, 'cc.Layout.layoutType', 'type');
-        js.obsolete(cc.Layout.prototype, 'cc.Layout.ResizeType', 'ResizeMode');
         js.obsolete(cc.Layout.prototype, 'cc.Layout.resize', 'resizeMode');
+        js.obsolete(cc.Layout.prototype, 'cc.Layout._updateLayout', 'updateLayout');
     }
 
     markAsRemoved(cc.Scale9Sprite, [
-        'init',
         'resizableSpriteWithCapInsets',
         'updateWithSprite',
         'getOriginalSize',
@@ -685,7 +682,8 @@ if (CC_DEV) {
         },
     });
 
-}
+    if (typeof dragonBones !== 'undefined') {
+        js.obsolete(dragonBones.CCFactory, 'dragonBones.CCFactory.getFactory', 'getInstance');
+    }
 
-// remove after 1.5
-js.obsolete(cc.loader, 'cc.loader.loadResAll', 'loadResDir');
+}

@@ -194,6 +194,17 @@ var PageView = cc.Class({
         },
 
         /**
+         * !#en The time required to turn over a page. unit: second
+         * !#zh 每个页面翻页时所需时间。单位：秒
+         * @property {Number} pageTurningSpeed
+         */
+        pageTurningSpeed: {
+            default: 0.3,
+            type: cc.Float,
+            tooltip: CC_DEV && 'i18n:COMPONENT.pageview.pageTurningSpeed'
+        },
+
+        /**
          * !#en PageView events callback
          * !#zh 滚动视图的事件回调函数
          * @property {Component.EventHandler[]} pageEvents
@@ -212,21 +223,20 @@ var PageView = cc.Class({
     },
 
     __preload: function () {
-        this._super();
         this.node.on('size-changed', this._updateAllPagesSize, this);
     },
 
     onEnable: function () {
         this._super();
         if(!CC_EDITOR) {
-            this.node.on('scroll-ended', this._dispatchPageTurningEvent, this);
+            this.node.on('scroll-ended-with-threshold', this._dispatchPageTurningEvent, this);
         }
     },
 
     onDisable: function () {
         this._super();
         if(!CC_EDITOR) {
-            this.node.off('scroll-ended', this._dispatchPageTurningEvent, this);
+            this.node.off('scroll-ended-with-threshold', this._dispatchPageTurningEvent, this);
         }
     },
 
@@ -238,7 +248,6 @@ var PageView = cc.Class({
     },
 
     onDestroy: function() {
-        this._super();
         this.node.off('size-changed', this._updateAllPagesSize, this);
     },
 
@@ -360,7 +369,7 @@ var PageView = cc.Class({
      * @param {Number} timeInSecond scrolling time
      */
     scrollToPage: function (idx, timeInSecond) {
-        if (idx < 0 || idx > this._pages.length)
+        if (idx < 0 || idx >= this._pages.length)
             return;
         timeInSecond = timeInSecond !== undefined ? timeInSecond : 0.3;
         this._curPageIdx = idx;
@@ -400,7 +409,7 @@ var PageView = cc.Class({
                     }
                 }
             }
-            layout._updateLayout();
+            layout.updateLayout();
         }
     },
 
@@ -408,11 +417,6 @@ var PageView = cc.Class({
     _updatePageView: function () {
         var pageCount = this._pages.length;
 
-        // 当页面数组变化时修改 content 大小
-        var layout = this.content.getComponent(cc.Layout);
-        if(layout && layout.enabled) {
-            layout._updateLayout();
-        }
         if (this._curPageIdx >= pageCount) {
             this._curPageIdx = pageCount === 0 ? 0 : pageCount - 1;
             this._lastPageIdx = this._curPageIdx;
@@ -427,6 +431,13 @@ var PageView = cc.Class({
                 this._scrollCenterOffsetY[i] = Math.abs(this.content.y + this._pages[i].y);
             }
         }
+
+        // 当页面数组变化时修改 content 大小
+        var layout = this.content.getComponent(cc.Layout);
+        if (layout && layout.enabled) {
+            layout.updateLayout();
+        }
+        
         // 刷新 indicator 信息与状态
         if (this.indicator) {
             this.indicator._refresh();
@@ -560,20 +571,21 @@ var PageView = cc.Class({
         }
         else {
             var index = this._curPageIdx, nextIndex = index + this._getDragDirection(moveOffset);
+            var timeInSecond = this.pageTurningSpeed * Math.abs(index - nextIndex);
             if (nextIndex < this._pages.length) {
                 if (this._isScrollable(moveOffset, index, nextIndex)) {
-                    this.scrollToPage(nextIndex);
+                    this.scrollToPage(nextIndex, timeInSecond);
                     return;
                 }
                 else {
                     var touchMoveVelocity = this._calculateTouchMoveVelocity();
                     if (this._isQuicklyScrollable(touchMoveVelocity)) {
-                        this.scrollToPage(nextIndex);
+                        this.scrollToPage(nextIndex, timeInSecond);
                         return;
                     }
                 }
             }
-            this.scrollToPage(index);
+            this.scrollToPage(index, timeInSecond);
         }
     },
 
@@ -607,6 +619,6 @@ cc.PageView = module.exports = PageView;
  * !#zh
  * 注意：此事件是从该组件所属的 Node 上面派发出来的，需要用 node.on 来监听。
  * @event page-turning
- * @param {Event} event
+ * @param {Event.EventCustom} event
  * @param {PageView} event.detail - The PageView component.
  */

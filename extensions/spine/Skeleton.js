@@ -143,7 +143,7 @@ sp.Skeleton = cc.Class({
                 this.defaultAnimation = '';
                 this._refresh();
             },
-            tooltip: 'i18n:COMPONENT.skeleton.skeleton_data'
+            tooltip: CC_DEV && 'i18n:COMPONENT.skeleton.skeleton_data'
         },
 
         ///**
@@ -243,7 +243,7 @@ sp.Skeleton = cc.Class({
             type: DefaultSkinsEnum,
             visible: true,
             displayName: "Default Skin",
-            tooltip: 'i18n:COMPONENT.skeleton.default_skin'
+            tooltip: CC_DEV && 'i18n:COMPONENT.skeleton.default_skin'
         },
 
         // value of 0 represents no animation
@@ -285,7 +285,7 @@ sp.Skeleton = cc.Class({
             type: DefaultAnimsEnum,
             visible: true,
             displayName: 'Animation',
-            tooltip: 'i18n:COMPONENT.skeleton.animation'
+            tooltip: CC_DEV && 'i18n:COMPONENT.skeleton.animation'
         },
 
         //// for inspector
@@ -310,7 +310,7 @@ sp.Skeleton = cc.Class({
          */
         loop: {
             default: true,
-            tooltip: 'i18n:COMPONENT.skeleton.loop'
+            tooltip: CC_DEV && 'i18n:COMPONENT.skeleton.loop'
         },
 
         /**
@@ -333,7 +333,7 @@ sp.Skeleton = cc.Class({
                     this._sgNode.setPremultipliedAlpha(value);
                 }
             },
-            tooltip: 'i18n:COMPONENT.skeleton.premultipliedAlpha'
+            tooltip: CC_DEV && 'i18n:COMPONENT.skeleton.premultipliedAlpha'
         },
 
         /**
@@ -349,7 +349,7 @@ sp.Skeleton = cc.Class({
                     this._sgNode.setTimeScale(this.timeScale);
                 }
             },
-            tooltip: 'i18n:COMPONENT.skeleton.time_scale'
+            tooltip: CC_DEV && 'i18n:COMPONENT.skeleton.time_scale'
         },
 
         /**
@@ -366,7 +366,7 @@ sp.Skeleton = cc.Class({
                 }
             },
             editorOnly: true,
-            tooltip: 'i18n:COMPONENT.skeleton.debug_slots'
+            tooltip: CC_DEV && 'i18n:COMPONENT.skeleton.debug_slots'
         },
 
         /**
@@ -383,19 +383,18 @@ sp.Skeleton = cc.Class({
                 }
             },
             editorOnly: true,
-            tooltip: 'i18n:COMPONENT.skeleton.debug_bones'
+            tooltip: CC_DEV && 'i18n:COMPONENT.skeleton.debug_bones'
         }
     },
 
     // IMPLEMENT
 
     __preload: function () {
-        // sgNode 的尺寸不是很可靠 同时 Node 的框框也没办法和渲染匹配 只好强制尺寸为零
-        if (CC_DEV) {
+        if (CC_EDITOR) {
             var Flags = cc.Object.Flags;
-            this._objFlags &= Flags.PersistentMask; // for v1.0 project
             this._objFlags |= (Flags.IsAnchorLocked | Flags.IsSizeLocked);
         }
+        // sgNode 的尺寸不是很可靠 同时 Node 的框框也没办法和渲染匹配 只好强制尺寸为零
         this.node.setContentSize(0, 0);
         //
         this._refresh();
@@ -672,8 +671,12 @@ sp.Skeleton = cc.Class({
     },
 
     /**
-     * !#en Sets skeleton data to sp.Skeleton.
-     * !#zh 设置 Skeleton 中的 Skeleton Data。
+     * !#en
+     * Sets runtime skeleton data to sp.Skeleton.<br>
+     * This method is different from the `skeletonData` property. This method is passed in the raw data provided by the Spine runtime, and the skeletonData type is the asset type provided by Creator.
+     * !#zh
+     * 设置底层运行时用到的 SkeletonData。<br>
+     * 这个接口有别于 `skeletonData` 属性，这个接口传入的是 Spine runtime 提供的原始数据，而 skeletonData 的类型是 Creator 提供的资源类型。
      * @method setSkeletonData
      * @param {sp.spine.SkeletonData} skeletonData
      * @param {sp.spine.SkeletonData} ownsSkeletonData
@@ -784,7 +787,7 @@ sp.Skeleton = cc.Class({
      */
     addAnimation: function (trackIndex, name, loop, delay) {
         if (this._sgNode) {
-            return this._sgNode.addAnimation(trackIndex, name, loop, delay);
+            return this._sgNode.addAnimation(trackIndex, name, loop, delay || 0);
         }
         return null;
     },

@@ -1,5 +1,5 @@
 /****************************************************************************
- Copyright (c) 2013-2016 Chukong Technologies Inc.
+ Copyright (c) 2013-2017 Chukong Technologies Inc.
 
  http://www.cocos.com
 
@@ -30,17 +30,23 @@ if (!(CC_EDITOR && Editor.isMainProcess)) {
 }
 
 require('../audio/CCAudioEngine');
+var inputManager = require('./platform/CCInputManager');
 
 /**
  * !#en An object to boot the game.
  * !#zh 包含游戏主体信息并负责驱动游戏的游戏对象。
  * @class Game
+ * @extends EventTarget
  */
 var game = {
 
     /**
-     * Event triggered when game hide to background.
-     * Please note that this event is not 100% guaranteed to be fired.
+     * !#en Event triggered when game hide to background.
+     * Please note that this event is not 100% guaranteed to be fired on Web platform,
+     * on native platforms, it corresponds to enter background event, os status bar or notification center may not trigger this event.
+     * !#zh 游戏进入后台时触发的事件。
+     * 请注意，在 WEB 平台，这个事件不一定会 100% 触发，这完全取决于浏览器的回调行为。
+     * 在原生平台，它对应的是应用被切换到后台事件，下拉菜单和上拉状态栏等不一定会触发这个事件，这取决于系统行为。
      * @property EVENT_HIDE
      * @type {String}
      * @example
@@ -53,7 +59,11 @@ var game = {
 
     /**
      * Event triggered when game back to foreground
-     * Please note that this event is not 100% guaranteed to be fired.
+     * Please note that this event is not 100% guaranteed to be fired on Web platform,
+     * on native platforms, it corresponds to enter foreground event.
+     * !#zh 游戏进入前台运行时触发的事件。
+     * 请注意，在 WEB 平台，这个事件不一定会 100% 触发，这完全取决于浏览器的回调行为。
+     * 在原生平台，它对应的是应用被切换到前台事件。
      * @property EVENT_SHOW
      * @type {String}
      */
@@ -88,7 +98,7 @@ var game = {
     CONFIG_KEY: {
         width: "width",
         height: "height",
-        engineDir: "engineDir",
+        // engineDir: "engineDir",
         debugMode: "debugMode",
         exposeClassName: "exposeClassName",
         showFPS: "showFPS",
@@ -129,14 +139,14 @@ var game = {
      * !#en The container of game canvas, equals to cc.container.
      * !#zh 游戏画布的容器。
      * @property container
-     * @type {Object}
+     * @type {HTMLDivElement}
      */
     container: null,
     /**
      * !#en The canvas of the game, equals to cc._canvas.
      * !#zh 游戏的画布。
      * @property canvas
-     * @type {Object}
+     * @type {HTMLCanvasElement}
      */
     canvas: null,
 
@@ -223,7 +233,7 @@ var game = {
         var self = this, config = self.config, CONFIG_KEY = self.CONFIG_KEY;
         config[CONFIG_KEY.frameRate] = frameRate;
         if (self._intervalId)
-            window.cancelAnimationFrame(self._intervalId);
+            window.cancelAnimFrame(self._intervalId);
         self._intervalId = 0;
         self._paused = true;
         self._setAnimFrame();
@@ -255,7 +265,7 @@ var game = {
         }
         // Pause main loop
         if (this._intervalId)
-            window.cancelAnimationFrame(this._intervalId);
+            window.cancelAnimFrame(this._intervalId);
         this._intervalId = 0;
     },
 
@@ -292,13 +302,25 @@ var game = {
      * @method restart
      */
     restart: function () {
-        cc.director.popToSceneStackLevel(0);
-        // Clean up audio
-        if (cc.audioEngine) {
-            cc.audioEngine.uncacheAll();
-        }
+        cc.director.once(cc.Director.EVENT_AFTER_DRAW, function () {
+            for (var id in game._persistRootNodes) {
+                game.removePersistRootNode(game._persistRootNodes[id]);
+            }
 
-        game.onStart();
+            // Clear scene
+            cc.director.getScene().destroy();
+            cc.Object._deferredDestroy();
+
+            cc.director.purgeDirector();
+
+            // Clean up audio
+            if (cc.audioEngine) {
+                cc.audioEngine.uncacheAll();
+            }
+
+            cc.director.reset();
+            game.onStart();
+        });
     },
 
     /**
@@ -446,7 +468,7 @@ var game = {
      * @param {Node} node - The node to be made persistent
      */
     addPersistRootNode: function (node) {
-        if (!(node instanceof cc.Node) || !node.uuid) {
+        if (!cc.Node.isNode(node) || !node.uuid) {
             cc.warnID(3800);
             return;
         }
@@ -507,7 +529,7 @@ var game = {
         this._frameTime = 1000 / frameRate;
         if (frameRate !== 60 && frameRate !== 30) {
             window.requestAnimFrame = this._stTime;
-            window.cancelAnimationFrame = this._ctTime;
+            window.cancelAnimFrame = this._ctTime;
         }
         else {
             window.requestAnimFrame = window.requestAnimationFrame ||
@@ -516,7 +538,7 @@ var game = {
             window.oRequestAnimationFrame ||
             window.msRequestAnimationFrame ||
             this._stTime;
-            window.cancelAnimationFrame = window.cancelAnimationFrame ||
+            window.cancelAnimFrame = window.cancelAnimationFrame ||
             window.cancelRequestAnimationFrame ||
             window.msCancelRequestAnimationFrame ||
             window.mozCancelRequestAnimationFrame ||
@@ -550,15 +572,13 @@ var game = {
 
         callback = function () {
             if (!self._paused) {
+                self._intervalId = window.requestAnimFrame(callback);
                 if (frameRate === 30) {
                     if (skip = !skip) {
-                        self._intervalId = window.requestAnimFrame(callback);
                         return;
                     }
                 }
-
                 director.mainLoop();
-                self._intervalId = window.requestAnimFrame(callback);
             }
         };
 
@@ -610,7 +630,7 @@ var game = {
             config[CONFIG_KEY.registerSystemEvent] = true;
         }
         config[CONFIG_KEY.showFPS] = (CONFIG_KEY.showFPS in config) ? (!!config[CONFIG_KEY.showFPS]) : true;
-        config[CONFIG_KEY.engineDir] = config[CONFIG_KEY.engineDir] || 'frameworks/cocos2d-html5';
+        // config[CONFIG_KEY.engineDir] = config[CONFIG_KEY.engineDir] || 'frameworks/cocos2d-html5';
 
         // Scene parser
         this._sceneInfos = config[CONFIG_KEY.scenes] || [];
@@ -635,62 +655,80 @@ var game = {
 
         var el = this.config[game.CONFIG_KEY.id],
             win = window,
-            element = cc.$(el) || cc.$('#' + el),
-            localCanvas, localContainer, localConStyle;
+            localCanvas, localContainer,
+            isWeChatGame = cc.sys.platform === cc.sys.WECHAT_GAME;
 
-        if (element.tagName === "CANVAS") {
-            width = width || element.width;
-            height = height || element.height;
-
-            //it is already a canvas, we wrap it around with a div
-            this.canvas = cc._canvas = localCanvas = element;
+        if (isWeChatGame) {
             this.container = cc.container = localContainer = document.createElement("DIV");
-            if (localCanvas.parentNode)
-                localCanvas.parentNode.insertBefore(localContainer, localCanvas);
-        } else {
-            //we must make a new canvas and place into this element
-            if (element.tagName !== "DIV") {
-                cc.warnID(3819);
-            }
-            width = width || element.clientWidth;
-            height = height || element.clientHeight;
-            this.canvas = cc._canvas = localCanvas = document.createElement("CANVAS");
-            this.container = cc.container = localContainer = document.createElement("DIV");
-            element.appendChild(localContainer);
+            this.frame = localContainer.parentNode === document.body ? document.documentElement : localContainer.parentNode;
+            this.canvas = cc._canvas = localCanvas = canvas;
         }
-        localContainer.setAttribute('id', 'Cocos2dGameContainer');
-        localContainer.appendChild(localCanvas);
-        this.frame = (localContainer.parentNode === document.body) ? document.documentElement : localContainer.parentNode;
+        else {
+            var element = (el instanceof HTMLElement) ? el : (document.querySelector(el) || document.querySelector('#' + el));
 
-        localCanvas.addClass("gameCanvas");
-        localCanvas.setAttribute("width", width || 480);
-        localCanvas.setAttribute("height", height || 320);
-        localCanvas.setAttribute("tabindex", 99);
+            if (element.tagName === "CANVAS") {
+                width = width || element.width;
+                height = height || element.height;
+
+                //it is already a canvas, we wrap it around with a div
+                this.canvas = cc._canvas = localCanvas = element;
+                this.container = cc.container = localContainer = document.createElement("DIV");
+                if (localCanvas.parentNode)
+                    localCanvas.parentNode.insertBefore(localContainer, localCanvas);
+            } else {
+                //we must make a new canvas and place into this element
+                if (element.tagName !== "DIV") {
+                    cc.warnID(3819);
+                }
+                width = width || element.clientWidth;
+                height = height || element.clientHeight;
+                this.canvas = cc._canvas = localCanvas = document.createElement("CANVAS");
+                this.container = cc.container = localContainer = document.createElement("DIV");
+                element.appendChild(localContainer);
+            }
+            localContainer.setAttribute('id', 'Cocos2dGameContainer');
+            localContainer.appendChild(localCanvas);
+            this.frame = (localContainer.parentNode === document.body) ? document.documentElement : localContainer.parentNode;
+
+            function addClass (element, name) {
+                var hasClass = (' ' + element.className + ' ').indexOf(' ' + name + ' ') > -1;
+                if (!hasClass) {
+                    if (element.className) {
+                        element.className += " ";
+                    }
+                    element.className += name;
+                }
+            }
+            addClass(localCanvas, "gameCanvas");
+            localCanvas.setAttribute("width", width || 480);
+            localCanvas.setAttribute("height", height || 320);
+            localCanvas.setAttribute("tabindex", 99);
+        }
 
         if (cc._renderType === game.RENDER_TYPE_WEBGL) {
-            this._renderContext = cc._renderContext = cc.webglContext
-             = cc.create3DContext(localCanvas, {
+            var opts = {
                 'stencil': true,
-                'alpha': true,
-                'antialias': cc.sys.isMobile
-            });
+                // MSAA is causing serious performance dropdown on some browsers,
+                // it's temporarily desactivated until we found correct way to let user customize it.
+                'antialias': false,
+                'alpha': cc.macro.ENABLE_TRANSPARENT_CANVAS
+            };
+            if (isWeChatGame) {
+                opts['preserveDrawingBuffer'] = true;
+            }
+            this._renderContext = cc._renderContext = cc.webglContext
+             = cc.create3DContext(localCanvas, opts);
         }
         // WebGL context created successfully
         if (this._renderContext) {
             cc.renderer = cc.rendererWebGL;
             win.gl = this._renderContext; // global variable declared in CCMacro.js
             cc.renderer.init();
-            cc._drawingUtil = new cc.DrawingPrimitiveWebGL(this._renderContext);
-            cc.textureCache._initializingRenderer();
-            cc.glExt = {};
-            cc.glExt.instanced_arrays = win.gl.getExtension("ANGLE_instanced_arrays");
-            cc.glExt.element_uint = win.gl.getExtension("OES_element_index_uint");
         } else {
             cc._renderType = game.RENDER_TYPE_CANVAS;
             cc.renderer = cc.rendererCanvas;
             cc.renderer.init();
             this._renderContext = cc._renderContext = new cc.CanvasContextWrapper(localCanvas.getContext("2d"));
-            cc._drawingUtil = cc.DrawingPrimitiveCanvas ? new cc.DrawingPrimitiveCanvas(this._renderContext) : null;
         }
 
         cc._gameDiv = localContainer;
@@ -708,7 +746,7 @@ var game = {
 
         // register system events
         if (this.config[this.CONFIG_KEY.registerSystemEvent])
-            cc.inputManager.registerSystemEvent(this.canvas);
+            inputManager.registerSystemEvent(this.canvas);
 
         if (typeof document.hidden !== 'undefined') {
             hidden = "hidden";
@@ -750,7 +788,12 @@ var game = {
         }
 
         if (navigator.userAgent.indexOf("MicroMessenger") > -1) {
-            win.onfocus = function(){ onShow() };
+            win.onfocus = onShow;
+        }
+
+        if (CC_WECHATGAME) {
+            wx.onShow(onShow);
+            wx.onHide(onHidden);
         }
 
         if ("onpageshow" in window && "onpagehide" in window) {

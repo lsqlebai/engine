@@ -311,6 +311,10 @@ var Button = cc.Class({
             type: cc.SpriteFrame,
             displayName: 'Pressed',
             tooltip: CC_DEV && 'i18n:COMPONENT.button.pressed_sprite',
+            formerlySerializedAs: 'pressedSprite',
+            notify: function () {
+                this._updateState();
+            }
         },
 
         /**
@@ -323,6 +327,10 @@ var Button = cc.Class({
             type: cc.SpriteFrame,
             displayName: 'Hover',
             tooltip: CC_DEV && 'i18n:COMPONENT.button.hover_sprite',
+            formerlySerializedAs: 'hoverSprite',
+            notify: function () {
+                this._updateState();
+            }
         },
 
         /**
@@ -664,6 +672,6 @@ cc.Button = module.exports = Button;
  * !#zh
  * 注意：此事件是从该组件所属的 Node 上面派发出来的，需要用 node.on 来监听。
  * @event click
- * @param {Event} event
+ * @param {Event.EventCustom} event
  * @param {Button} event.detail - The Button component.
  */

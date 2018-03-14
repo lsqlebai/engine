@@ -22,7 +22,7 @@
  THE SOFTWARE.
  ****************************************************************************/
 
-var misc = require('../cocos2d/core/utils/misc');
+var misc = require('../core/utils/misc');
 
 cc.RenderTexture.WebGLRenderCmd = function(renderableObject){
     this._rootCtor(renderableObject);
@@ -135,12 +135,11 @@ proto.updateClearColor = function(clearColor){ };
 
 proto.initWithWidthAndHeight = function(width, height, format, depthStencilFormat){
     var node = this._node;
-    if(format === cc.Texture2D.PIXEL_FORMAT_A8)
+    if(format === cc.Texture2D.PixelFormat.A8)
         cc.log( "cc.RenderTexture._initWithWidthAndHeightForWebGL() : only RGB and RGBA formats are valid for a render texture;");
 
     var gl = cc._renderContext;
     this._fullRect = new cc.Rect(0,0, width, height);
-    this._fullViewport = new cc.Rect(0,0, width, height);
 
     width = 0 | width;
     height = 0 | height;
@@ -158,6 +157,8 @@ proto.initWithWidthAndHeight = function(width, height, format, depthStencilForma
         powH = misc.NextPOT(height);
     }
 
+    this._fullViewport = new cc.Rect(0,0, powW, powH);
+
     //void *data = malloc(powW * powH * 4);
     var dataLen = powW * powH * 4;
     var data = new Uint8Array(dataLen);
@@ -171,7 +172,7 @@ proto.initWithWidthAndHeight = function(width, height, format, depthStencilForma
     if (!node._texture)
         return false;
 
-    locTexture.initWithData(data, node._pixelFormat, powW, powH, cc.size(width, height));
+    locTexture.initWithData(data, node._pixelFormat, powW, powH);
     //free( data );
 
     var oldRBO = gl.getParameter(gl.RENDERBUFFER_BINDING);
@@ -180,7 +181,7 @@ proto.initWithWidthAndHeight = function(width, height, format, depthStencilForma
         this._textureCopy = new cc.Texture2D();
         if (!this._textureCopy)
             return false;
-        this._textureCopy.initWithData(data, node._pixelFormat, powW, powH, cc.size(width, height));
+        this._textureCopy.initWithData(data, node._pixelFormat, powW, powH);
     }
 
     // generate FBO
@@ -188,7 +189,7 @@ proto.initWithWidthAndHeight = function(width, height, format, depthStencilForma
     gl.bindFramebuffer(gl.FRAMEBUFFER, this._fBO);
 
     // associate texture with FBO
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, locTexture._webTextureObj, 0);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, locTexture._glID, 0);
 
     if (depthStencilFormat !== 0) {
         //create and attach depth buffer
@@ -237,15 +238,14 @@ proto.begin = function(){
     var director = cc.director;
     director.setProjection(director.getProjection());
 
-    var texSize = node._texture.getContentSizeInPixels();
-
     // Calculate the adjustment ratios based on the old and new projections
     var size = cc.director.getWinSizeInPixels();
-    var widthRatio = size.width / texSize.width;
-    var heightRatio = size.height / texSize.height;
+    var widthRatio = size.width / node._texture.width;
+    var heightRatio = size.height / node._texture.height;
 
     var orthoMatrix = cc.math.Matrix4.createOrthographicProjection(-1.0 / widthRatio, 1.0 / widthRatio,
         -1.0 / heightRatio, 1.0 / heightRatio, -1, 1);
+    cc.math.glMatrixMode(cc.math.KM_GL_PROJECTION);
     cc.math.glMultMatrix(orthoMatrix);
 
     //calculate viewport
@@ -268,10 +268,10 @@ proto.begin = function(){
      */
     if (cc.configuration.checkForGLExtension("GL_QCOM")) {
         // -- bind a temporary texture so we can clear the render buffer without losing our texture
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this._textureCopy._webTextureObj, 0);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this._textureCopy._glID, 0);
         //cc.checkGLErrorDebug();
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, node._texture._webTextureObj, 0);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, node._texture._glID, 0);
     }
 };
 

@@ -28,7 +28,7 @@ var Base = require('./CCRendererUnderSG');
 /**
  * !#en Enum for sprite type.
  * !#zh Sprite 类型
- * @enum Sprite.SpriteType
+ * @enum Sprite.Type
  */
 /**
  * !#en The simple type.
@@ -197,9 +197,7 @@ var Sprite = cc.Class({
             },
             set: function (value) {
                 this._type = value;
-                this._sgNode.setRenderingType(this._type);
-                // manual settings inset top, bttom, right, left.
-                this._applyCapInset();
+                this._sgNode.setRenderingType(value);
             },
             type: SpriteType,
             animatable: false,
@@ -512,57 +510,56 @@ var Sprite = cc.Class({
         }
     },
 
-    _applyCapInset: function () {
-        if (this._type === SpriteType.SLICED && this._spriteFrame) {
-            var sgNode = this._sgNode;
-            sgNode.setInsetTop(this._spriteFrame.insetTop);
-            sgNode.setInsetBottom(this._spriteFrame.insetBottom);
-            sgNode.setInsetRight(this._spriteFrame.insetRight);
-            sgNode.setInsetLeft(this._spriteFrame.insetLeft);
-        }
+    _applySpriteFrameInsets: function () {
+        var spriteFrame = this._spriteFrame;
+        var sgNode = this._sgNode;
+        sgNode.setInsetTop(spriteFrame.insetTop);
+        sgNode.setInsetBottom(spriteFrame.insetBottom);
+        sgNode.setInsetRight(spriteFrame.insetRight);
+        sgNode.setInsetLeft(spriteFrame.insetLeft);
     },
 
     _applySpriteSize: function () {
-        if (SizeMode.CUSTOM === this._sizeMode || !this._spriteFrame) {
-            this.node.setContentSize(this.node.getContentSize(true));
-        } else if (SizeMode.RAW === this._sizeMode) {
-            var size = this._spriteFrame.getOriginalSize();
-            this.node.setContentSize(size);
-        } else if (SizeMode.TRIMMED === this._sizeMode) {
-            var rect = this._spriteFrame.getRect();
-            this.node.setContentSize(cc.size(rect.width, rect.height));
-        } else {
-            this.node.setContentSize(this.node.getContentSize(true));
+        if (this._spriteFrame) {
+            if (SizeMode.RAW === this._sizeMode) {
+                var size = this._spriteFrame.getOriginalSize();
+                this.node.setContentSize(size);
+            } else if (SizeMode.TRIMMED === this._sizeMode) {
+                var rect = this._spriteFrame.getRect();
+                this.node.setContentSize(rect.width, rect.height);
+            }
         }
     },
 
-    _onSpriteFrameLoaded: function (event) {
+    _onTextureLoaded: function (event) {
         var self = this;
         if (!self.isValid) {
             return;
         }
         var sgNode = self._sgNode;
         sgNode.setSpriteFrame(self._spriteFrame);
-        self._applyCapInset();
         self._applySpriteSize();
         if (self.enabledInHierarchy && !sgNode.isVisible()) {
             sgNode.setVisible(true);
         }
     },
 
-    _applySpriteFrame: function (oldFrame) {
+    _applySpriteFrame: function (oldFrame, keepInsets) {
         var sgNode = this._sgNode;
         if (oldFrame && oldFrame.off) {
-            oldFrame.off('load', this._onSpriteFrameLoaded, this);
+            oldFrame.off('load', this._onTextureLoaded, this);
         }
 
         var spriteFrame = this._spriteFrame;
         if (spriteFrame) {
+            if (!keepInsets) {
+                this._applySpriteFrameInsets();
+            }
             if (spriteFrame.textureLoaded()) {
-                this._onSpriteFrameLoaded(null);
+                this._onTextureLoaded(null);
             }
             else {
-                spriteFrame.once('load', this._onSpriteFrameLoaded, this);
+                spriteFrame.once('load', this._onTextureLoaded, this);
                 spriteFrame.ensureLoadTexture();
             }
         }
@@ -581,10 +578,12 @@ var Sprite = cc.Class({
     },
 
     _initSgNode: function () {
-        this._applySpriteFrame(null);
         var sgNode = this._sgNode;
+        var insetsChangedViaAPI = sgNode.getInsetLeft() !== 0 || sgNode.getInsetRight() !== 0 ||
+                                  sgNode.getInsetTop() !== 0 || sgNode.getInsetBottom() !== 0;
+        this._applySpriteFrame(null, insetsChangedViaAPI);
 
-        // should keep the size of the sg node the same as entity,
+        // sgNode is the sizeProvider of the node so we should sync its size with the node,
         // otherwise setContentSize may not take effect
         sgNode.setContentSize(this.node.getContentSize(true));
         this._applySpriteSize();

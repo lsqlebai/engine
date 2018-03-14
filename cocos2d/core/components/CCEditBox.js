@@ -24,7 +24,7 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  ****************************************************************************/
-
+require('../editbox/CCSGEditBox');
 /**
  * !#en Enum for keyboard return types
  * !#zh 键盘的返回键类型
@@ -395,7 +395,7 @@ var EditBox = cc.Class({
         /**
          * !#en The event handler to be called when EditBox began to edit text.
          * !#zh 开始编辑文本输入框触发的事件回调。
-         * @property {Component.EventHandler} editingDidBegin
+         * @property {Component.EventHandler[]} editingDidBegan
          */
         editingDidBegan: {
             default: [],
@@ -405,7 +405,7 @@ var EditBox = cc.Class({
         /**
          * !#en The event handler to be called when EditBox text changes.
          * !#zh 编辑文本输入框时触发的事件回调。
-         * @property {Component.EventHandler} textChanged
+         * @property {Component.EventHandler[]} textChanged
          */
         textChanged: {
             default: [],
@@ -415,7 +415,7 @@ var EditBox = cc.Class({
         /**
          * !#en The event handler to be called when EditBox edit ends.
          * !#zh 结束编辑文本输入框时触发的事件回调。
-         * @property {Component.EventHandler} editingDidEnded
+         * @property {Component.EventHandler[]} editingDidEnded
          */
         editingDidEnded: {
             default: [],
@@ -425,7 +425,7 @@ var EditBox = cc.Class({
         /**
          * !#en The event handler to be called when return key is pressed. Windows is not supported.
          * !#zh 当用户按下回车按键时的事件回调，目前不支持 windows 平台
-         * @property {Component.EventHandler} editingReturn
+         * @property {Component.EventHandler[]} editingReturn
          */
         editingReturn: {
             default: [],
@@ -518,6 +518,11 @@ var EditBox = cc.Class({
         this.node.emit('editing-return', this);
     },
 
+    onDestroy: function () {
+        this._sgNode.setDelegate(null);
+        this._super();
+    },
+
     __preload: function() {
         this._super();
 
@@ -593,7 +598,7 @@ cc.EditBox = module.exports = EditBox;
  * !#zh
  * 注意：此事件是从该组件所属的 Node 上面派发出来的，需要用 node.on 来监听。
  * @event editing-did-began
- * @param {Event} event
+ * @param {Event.EventCustom} event
  * @param {EditBox} event.detail - The EditBox component.
  */
 
@@ -603,7 +608,7 @@ cc.EditBox = module.exports = EditBox;
  * !#zh
  * 注意：此事件是从该组件所属的 Node 上面派发出来的，需要用 node.on 来监听。
  * @event editing-did-ended
- * @param {Event} event
+ * @param {Event.EventCustom} event
  * @param {EditBox} event.detail - The EditBox component.
  */
 
@@ -613,7 +618,7 @@ cc.EditBox = module.exports = EditBox;
  * !#zh
  * 注意：此事件是从该组件所属的 Node 上面派发出来的，需要用 node.on 来监听。
  * @event text-changed
- * @param {Event} event
+ * @param {Event.EventCustom} event
  * @param {EditBox} event.detail - The EditBox component.
  */
 
@@ -623,6 +628,21 @@ cc.EditBox = module.exports = EditBox;
  * !#zh
  * 注意：此事件是从该组件所属的 Node 上面派发出来的，需要用 node.on 来监听。
  * @event editing-return
- * @param {Event} event
+ * @param {Event.EventCustom} event
  * @param {EditBox} event.detail - The EditBox component.
+ */
+
+/**
+ * !#en if you don't need the EditBox and it isn't in any running Scene, you should
+ * call the destroy method on this component or the associated node explicitly.
+ * Otherwise, the created DOM element won't be removed from web page.
+ * !#zh
+ * 如果你不再使用 EditBox，并且组件未添加到场景中，那么你必须手动对组件或所在节点调用 destroy。
+ * 这样才能移除网页上的 DOM 节点，避免 Web 平台内存泄露。
+ * @example
+ * editbox.node.parent = null;  // or  editbox.node.removeFromParent(false);
+ * // when you don't need editbox anymore
+ * editbox.node.destroy();
+ * @method destroy
+ * @return {Boolean} whether it is the first time the destroy being called
  */

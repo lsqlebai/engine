@@ -24,6 +24,7 @@
  ****************************************************************************/
 
 var JsonUnpacker = require('./json-unpacker');
+var pushToMap = require('../utils/misc').pushToMap;
 
 // {assetUuid: packUuid|[packUuid]}
 // If value is array of packUuid, then the first one will be prioritized for download,
@@ -46,8 +47,8 @@ var PackState = {
     Loaded: 3,
 };
 
-function error (callback, uuid, packUuid) {
-    callback(new Error('Can not retrieve ' + uuid + ' from packer ' + packUuid));
+function error (uuid, packUuid) {
+    return new Error('Can not retrieve ' + uuid + ' from packer ' + packUuid);
 }
 
 module.exports = {
@@ -57,31 +58,16 @@ module.exports = {
             var uuids = packs[packUuid];
             for (var i = 0; i < uuids.length; i++) {
                 var uuid = uuids[i];
-                var allIncludedPacks = uuidToPack[uuid];
-                if (allIncludedPacks) {
-                    if (Array.isArray(allIncludedPacks)) {
-                        allIncludedPacks.push(packUuid);
-                    }
-                    else {
-                        uuidToPack[uuid] = allIncludedPacks = [allIncludedPacks, packUuid];
-                    }
-                    if (uuids.length === 1) {
-                        // the smallest pack must be at the beginning of the array to download more first
-                        var swapToLast = allIncludedPacks[0];
-                        allIncludedPacks[0] = allIncludedPacks[allIncludedPacks.length - 1];
-                        allIncludedPacks[allIncludedPacks.length - 1] = swapToLast;
-                    }
-                }
-                else {
-                    uuidToPack[uuid] = packUuid;
-                }
+                // the smallest pack must be at the beginning of the array to download more first
+                var pushFront = uuids.length === 1;
+                pushToMap(uuidToPack, uuid, packUuid, pushFront);
             }
         }
     },
 
     _loadNewPack: function (uuid, packUuid, callback) {
         var self = this;
-        var packUrl = cc.AssetLibrary.getImportedDir(packUuid) + '/' + packUuid + '.json';
+        var packUrl = cc.AssetLibrary.getLibUrlNoExt(packUuid) + '.json';
         cc.loader.load({ url: packUrl, ignoreMaxConcurrency: true }, function (err, packJson) {
             if (err) {
                 cc.errorID(4916, uuid);
@@ -92,7 +78,7 @@ module.exports = {
                 callback(null, res);
             }
             else {
-                error(callback, uuid, packUuid);
+                callback(error(uuid, packUuid));
             }
         });
     },
@@ -130,13 +116,16 @@ module.exports = {
     },
 
     /**
-     * @returns {Boolean} specify whether loaded by pack
+     * @returns {Object} When returns undefined, the requested item is not in any pack, when returns null, the item is in a loading pack, when item json exists, it will return the result directly.
      */
     load: function (item, callback) {
         var uuid = item.uuid;
         var packUuid = uuidToPack[uuid];
         if (!packUuid) {
-            return false;
+            // Return undefined to let caller know it's not recognized.
+            // We don't use false here because changing return value type may cause jit fail, 
+            // though return undefined may have the same issue.
+            return;
         }
 
         if (Array.isArray(packUuid)) {
@@ -146,25 +135,26 @@ module.exports = {
         var unpacker = globalUnpackers[packUuid];
         if (unpacker && unpacker.state === PackState.Loaded) {
             // ensure async
-            setTimeout(function () {
-                var json = unpacker.retrieve(uuid);
-                if (json) {
-                    callback(null, json);
-                }
-                else {
-                    error(callback, uuid, packUuid);
-                }
-            }, 0);
+            var json = unpacker.retrieve(uuid);
+            if (json) {
+                return json;
+            }
+            else {
+                return error(uuid, packUuid);
+            }
         }
         else {
             if (!unpacker) {
-                console.log('Create unpacker %s for %s', packUuid, uuid);
+                if (!CC_TEST) {
+                    console.log('Create unpacker %s for %s', packUuid, uuid);
+                }
                 unpacker = globalUnpackers[packUuid] = new JsonUnpacker();
                 unpacker.state = PackState.Downloading;
             }
             this._loadNewPack(uuid, packUuid, callback);
         }
-        return true;
+        // Return null to let caller know it's loading asynchronously
+        return null;
     }
 };
 

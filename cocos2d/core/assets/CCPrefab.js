@@ -40,6 +40,14 @@ var Prefab = cc.Class({
         data: null,
 
         /**
+         * !#en Indicates the raw assets of this prefab can be load after prefab loaded.
+         * !#zh 指示该 Prefab 依赖的资源可否在 Prefab 加载后再延迟加载。
+         * @property {Boolean} asyncLoadAssets
+         * @default false
+         */
+        asyncLoadAssets: undefined,
+
+        /**
          * Cache function for fast instantiation
          * @property {Function} _createFunction
          * @private
@@ -86,10 +94,20 @@ var Prefab = cc.Class({
     },
 
     _instantiate: function () {
-        // instantiate node
-        var node = this._doInstantiate();
-        // initialize node
-        this.data._instantiate(node);
+        var node;
+        if (CC_SUPPORT_JIT) {
+            // instantiate node
+            node = this._doInstantiate();
+            // initialize node
+            this.data._instantiate(node);
+        }
+        else {
+            // prefab asset is always synced
+            this.data._prefab._synced = true;
+            // instantiate node
+            node = this.data._instantiate();
+        }
+        
         // link prefab in editor
         if (CC_EDITOR || CC_TEST) {
             // This operation is not necessary, but some old prefab asset may not contain complete data.

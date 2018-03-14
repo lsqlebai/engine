@@ -1,4 +1,4 @@
-if (CC_DEV) {
+if (CC_DEBUG) {
     var logs = {
         //ActionManager: 1000
         "1000": "cc.ActionManager.addAction(): action must be non-null", //addAction
@@ -15,11 +15,13 @@ if (CC_DEV) {
         "1011": "cc.ActionInterval.setAmplitudeRate(): it should be overridden in subclass.", //ActionInterval.setAmplitudeRate
         "1012": "cc.ActionInterval.getAmplitudeRate(): it should be overridden in subclass.", //ActionInterval.getAmplitudeRate
         "1013": "The speed parameter error", //ActionInterval.speed
-        "1014": "The repeat parameter error", //ActionInterval.repeat        
+        "1014": "The repeat parameter error", //ActionInterval.repeat
         "1015": "parameters should not be ending with null in Javascript", //ActionInterval.seqeunce
         "1016": "cc.RotateTo.reverse(): it should be overridden in subclass.", //RotateTo.reverse
         "1017": "cc.GridAction.getGrid(): it should be overridden in subclass.", //ActionGrid.getGrid
         "1018": "Grid size must be (1,1)", //ActionGrid3D.initWithSize
+        "1019": "Failed to construct, Sequence construction needs two or more actions", //ActionInterval.sequence
+        "1020": "Failed to construct, Spawn construction needs two or more actions", //ActionInterval.spawn
         //configuration: 1100
         "1100": "Expected 'data' dict, but not found. Config file: %s", //loadConfigFile
         "1101": "Please load the resource first : %s", //loadConfigFile_2
@@ -48,17 +50,21 @@ if (CC_DEV) {
         "1402": "The 'visible' property of %s is deprecated, use 'enabled' instead please.", //visible
         "1403": "Sorry, cc.audioEngine.willPlayMusic is removed.", //willPlayMusicError
         "1404": "cc.spriteFrameCache is removed, please use cc.loader to load and cache sprite frames of atlas format.",
+        "1405": "The '%s' will be removed in v2.0, please use '%s' instead. \uD83D\uDE30",
         //Scheduler: 1500
-        "1500": "CCSheduler#scheduleCallback. Callback already scheduled. Updating interval from:%s to %s", //scheduleCallbackForTarget
-        "1501": "cc.scheduler.scheduleCallbackForTarget(): callback_fn should be non-null.", //scheduleCallbackForTarget_2
-        "1502": "cc.scheduler.scheduleCallbackForTarget(): target should be non-null.", //scheduleCallbackForTarget_3
-        "1503": "cc.Scheduler.pauseTarget():target should be non-null", //pauseTarget
-        "1504": "cc.Scheduler.resumeTarget():target should be non-null", //resumeTarget
-        "1505": "cc.Scheduler.isTargetPaused():target should be non-null", //isTargetPaused
+        "1500": "cc.Scheduler#schedule: Callback already scheduled. Updating interval from:%s to %s", //scheduleCallbackForTarget
+        "1501": "cc.Scheduler#scheduleCallbackForTarget(): callback_fn should be non-null.", //scheduleCallbackForTarget_2
+        "1502": "cc.Scheduler#scheduleCallbackForTarget(): target should be non-null.", //scheduleCallbackForTarget_3
+        "1503": "cc.Scheduler#pauseTarget():target should be non-null", //pauseTarget
+        "1504": "cc.Scheduler#resumeTarget():target should be non-null", //resumeTarget
+        "1505": "cc.Scheduler#isTargetPaused():target should be non-null", //isTargetPaused
         "1506": "warning: you CANNOT change update priority in scheduled function", //_schedulePerFrame
-        "1507": "CCScheduler#scheduleSelector. Selector already scheduled. Updating interval from: %.4f to %.4f", //schedule
+        "1507": "cc.Scheduler#scheduleSelector: Selector already scheduled. Updating interval from: %.4f to %.4f", //schedule
         "1508": "Argument callback must not be empty", //isScheduled
         "1509": "Argument target must be non-nullptr", //isScheduled
+        "1510": "cc.Scheduler: Illegal target which doesn't have uuid or instanceId",
+        "1511": "cc.Scheduler: pause state of the scheduled task doesn't match the element pause state in Scheduler, the given paused state will be ignored",
+        "1512": "cc.Scheduler: updateFunc parameter is deprecated in scheduleUpdate function, and will be removed in v2.0",
         //Node: 1600
         "1600": "getZOrder is deprecated. Please use getLocalZOrder instead.", //getZOrder
         "1601": "setZOrder is deprecated. Please use setLocalZOrder instead.", //setZOrder
@@ -85,7 +91,7 @@ if (CC_DEV) {
         "1622": "_ccsg.Node._requestDirtyFlag: failed to satisfy the request, key (%s) for flag have already been taken", //_requestDirtyFlag
         "1623": "Set '%s' to normal node (not persist root node).", //_onHierarchyChanged
         "1624": "Replacing with the same sgNode", //_replaceSgNode
-        "1625": "The replacement sgNode should not contain any child.", //_replaceSgNode_2       
+        "1625": "The replacement sgNode should not contain any child.", //_replaceSgNode_2
         "1626": "Should not set alpha via 'color', set 'opacity' please.", //color
         "1627": "Not support for asynchronous creating node in SG", //ctor
         "1628": "Renderer error: Size of the cc._RendererInSG._sgNode must be zero", //__preload
@@ -234,8 +240,7 @@ if (CC_DEV) {
         "3115": "Frame Grabber: could not attach texture to framebuffer", //CCGrabber.grab
         "3116": "WebGLRenderingContext.CLAMP_TO_EDGE should be used in NPOT textures", //setTexParameters
         "3117": "Mimpap texture only works in POT textures", //generateMipmap
-        //MissingFile: 3200
-        "3200": "Missing file: %s", //MissingFile
+        "3118": "contentSize parameter is deprecated and ignored for cc.Texture2D initWithData function", // initWithData
         //RectWidth: 3300
         "3300": "Rect width exceeds maximum margin: %s", //RectWidth
         //RectHeight: 3400
@@ -266,18 +271,17 @@ if (CC_DEV) {
         "3610": "The type of %s must be cc.Float or cc.Integer, not Number.", //getTypeChecker_7
         "3611": "Can not indicate the '%s' attribute for %s, which its default value is type of %s.", //getTypeChecker_8
         "3612": "%s Just set the default value to 'new %s()' and it will be handled properly.", //getTypeChecker_9
-        "3613": "'No need to use 'serializable: false' or 'editorOnly: true' for the getter of '%s.%s', every getter is actually non-serialized.", //defineGetSet
-        "3614": "Should not define constructor for cc.Component %s.", //define
+        "3613": "'No need to specify the '%s' attribute for the getter of '%s.%s', every getter is actually non-serialized.", //defineGetSet
         "3615": "Each script can have at most one Component.", //define_2
         "3616": "Should not specify class name %s for Component which defines in project.", //define_3
-        "3617": "Can not instantiate CCClass '%s' with arguments.", //_createCtor
+        "3617": "ctor of CCClass '%s' should not accept any arguments.", //_createCtor
         "3618": "ctor of '%s' can not be another CCClass", //_createCtor_2
         "3619": "ctor of '%s' must be function type", //_createCtor_3
         "3620": "this._super declared in '%s.%s' but no super method defined", //boundSuperCalls
         "3621": "Unknown type of %s.%s, maybe you want is '%s'.", //CCClass
         "3622": "Unknown type of %s.%s, property should be defined in 'properties' or 'ctor'", //CCClass_2
         "3623": "Can not use 'editor' attribute, '%s' not inherits from Components.", //CCClass_3
-        "3624": "'%s' overrided '%s' but '%s' is defined as 'false' so the super method will not be called. You can set '%s' to null to disable this warning.", //CCClass_4
+        "3624": "'%s' overwrote '%s' but '%s' is defined as 'false' so the super method will not be called. You can set '%s' to null to disable this warning.", //CCClass_4
         "3625": "[isChildClassOf] superclass should be function type, not", //isChildClassOf
         "3626": "Can't remove '%s' because '%s' depends on it.", //destroy
         "3627": "Should not add renderer component (%s) to a Canvas node.", //_registSizeProvider
@@ -289,24 +293,57 @@ if (CC_DEV) {
         "3633": "Properties function of '%s' should return an object!", //init
         "3634": "Disallow to use '.' in property name", //appendProp
         "3635": "Default array must be empty, set default value of %s.%s to [], and initialize in 'onLoad' or 'ctor' please. (just like 'this.%s = [...];')", //defineProp
-        "3636": "Do not set default value to non-empty object, unless the object defines its own 'clone' function. Set default value of %s.%s to null or {}, and initialize in 'onLoad' or 'ctor' please. (just like 'this.%s = {foo: bar};')", //defineProp_2        
-        "3637": "Can not declare %s.%s, it is already defined in the prototype of %s", //defineProp_3        
+        "3636": "Can not set default value to non-empty object, unless the object derived from cc.ValueType and overwrite the 'clone' function. Set default value of %s.%s to null or {}, and initialize in 'onLoad' or 'ctor' please. (just like 'this.%s = {foo: bar};')", //defineProp_2
+        "3637": "Can not declare %s.%s, it is already defined in the prototype of %s", //defineProp_3
         "3638": "'%s': the getter of '%s' is already defined!", //defineGetSet_2
-        "3639": "Can not apply the specified attribute to the getter of '%s.%s', attribute index: %s", //defineGetSet_3
         "3640": "'%s': the setter of '%s' is already defined!", //defineGetSet_4
         "3641": "Can not construct %s because it contains object property.", //getNewValueTypeCode
         "3642": "Cannot define %s.%s because static member name can not be '%s'.", //CCClass_4
-        "3643": "Can not define a member called 'constructor' in the class '%s', please use 'ctor' instead.", //CCClass_5        
+        "3643": "Can not define a member called 'constructor' in the class '%s', please use 'ctor' instead.", //CCClass_5
         "3644": "Please define 'type' parameter of %s.%s as the actual constructor.", //parseAttributes
         "3645": "Please define 'type' parameter of %s.%s as the constructor of %s.", //parseAttributes_2
-        "3646": "Unknown 'type' parameter of %s.%s：%s", //parseAttributes_3                
+        "3646": "Unknown 'type' parameter of %s.%s：%s", //parseAttributes_3
         "3647": "The length of range array must be equal or greater than 2", //parseAttributes_4
         "3648": "Can not declare %s.%s method, it is already defined in the properties of %s.",
+        "3649": "CCClass %s have conflict between its ctor and __ctor__.",
+        "3650": "No need to specifiy \"%s\" attribute for \"%s\" property in \"%s\" class.",    // 已废弃，提示信息仅用于生成 markdown 给旧版本用户查阅
+        "3651": "Can not call `_super` or `prototype.ctor` in ES6 Classes \"%s\", use `super` instead please.",
+        "3652": "Failed to construct a dummy instance of the \"%s\" class using `new` behind the scenes. This is for getting default values declared in TypeScript. Please ensure the class will be able to construct during script's initialization. %s",
+        "3653": "Please do not specifiy \"default\" attribute in decorator of \"%s\" property in \"%s\" class.\n" +
+                "  Default value must be initialized at their declaration: \uD83D\uDE02\n" +
+                "    // Before:\n" +
+                "    @property({\n" +
+                "      type: cc.Integer\n" +
+                "      default: 0  // <--\n" +
+                "    })\n" +
+                "    value;\n\n" +
+                "    // After:\n" +
+                "    @property({\n" +
+                "      type: cc.Integer\n" +
+                "    })\n" +
+                "    value = 0;    // <--",
+        "3654": "Please specifiy a default value for \"%s\" property at its declaration: \uD83D\uDE02\n" +
+                "    // Before:\n" +
+                "    @property(...)\n" +
+                "    value;\n\n" +
+                "    // After:\n" +
+                "    @property(...)\n" +
+                "    value = 0;",
+        "3655": "Can not specifiy \"get\" or \"set\"  attribute in decorator for \"%s\" property in \"%s\" class.\n" +
+                "  Please use:\n" +
+                "    @property(...)\n" +
+                "    get %s () {\n" +
+                "      ...\n" +
+                "    }\n" +
+                "    @property\n" +
+                "    set %s (value) {\n" +
+                "      ...\n" +
+                "    }",
         //Prefab: 3700
         "3700": "internal error: _prefab is undefined", //_doInstantiate
         "3701": "Failed to load prefab asset for node '%s'", //syncWithPrefab
         //Game: 3800
-        "3800": "The target can not be made persist because it\'s not a cc.Node or it doesn\'t have _id property.", //addPersistRootNode
+        "3800": "The target can not be made persist because it\'s invalid or it doesn\'t have _id property.", //addPersistRootNode
         "3801": "The node can not be made persist because it\'s not under root node.", //addPersistRootNode_2
         "3802": "The node can not be made persist because it\'s not in current scene.", //addPersistRootNode_3
         "3803": "The target can not be made persist because it\'s not a cc.Node or it doesn\'t have _id property.", //addPersistRootNode_4
@@ -321,9 +358,9 @@ if (CC_DEV) {
         "3812": "_addComponentAt: Index out of range", //_addComponentAt_2
         "3813": "removeComponent: Component must be non-nil", //removeComponent
         "3814": "Argument must be non-nil", //_removeComponent
-        "3815": "Component not owned by this entity", //_removeComponent_2        
-        "3816": "Node '%s' is already activating", //_activeRecursively
-        "3817": "Sorry, the component of '%s' which with an index of %s is corrupted! It has been removed.", //_activeRecursively_2
+        "3815": "Component not owned by this entity", //_removeComponent_2
+        "3816": "Node '%s' is already activating or deactivating.",
+        "3817": "Sorry, the component of '%s' which with an index of %s is corrupted! It has been removed.",
         "3818": "Failed to read or parse project.json", //_loadConfig
         "3819": "Warning: target element is not a DIV or CANVAS", //_initRenderer
         //Animation: 3900
@@ -351,7 +388,9 @@ if (CC_DEV) {
         "4008": "cc.LabelBMFont.initWithString(): Impossible to create font. Please check file", //
         "4009": "cocos2d: LabelBMFont: character not found %s", //BMFont.createFontChars
         "4010": "cc.LabelBMFont.setFntFile() : Impossible to create font. Please check file", //BMFont.setFntFile
-        "4011": "Property spriteFrame of BitmapFont '%s' is invalid. Using system font instead.", // BMFont spriteFrame is invalid.
+        "4011": "Property spriteFrame of Font '%s' is invalid. Using system font instead.", // BMFont spriteFrame is invalid.
+        "4012": "The texture of Font '%s' must be already loaded on JSB. Using system font instead.",
+        "4013": "Sorry, lineHeight of system font not supported on JSB.",
         //Layout: 4100
         "4100": "Property padding is deprecated, please use paddingLeft, paddingRight, paddingTop and paddingBottom instead", //padding
         //Mask: 4200
@@ -362,9 +401,6 @@ if (CC_DEV) {
         "4300": "can not found the %s page.", //removePage
         //RichText: 4400
         "4400": "Invalid RichText img tag! The sprite frame name can\'t be found in the ImageAtlas!", //_addRichTextImageElement
-        //ToggleGroup: 4500
-        "4500": "Toggle alreay in ToggleGroup. Something bad happened, please report this issue to the Creator developer, thanks.", //addToggle
-        "4501": "Toggle is not in ToggleGroup. Something bad happened, please report this issue to the Creator developer, thanks.", //removeToggle
         //MissingScript: 4600
         "4600": "Script attached to '%s' is missing or invalid.", //onLoad
         //EditBox: 4700
@@ -372,7 +408,6 @@ if (CC_DEV) {
         //AutoReleaseUtils: 4800
         "4800": "unknown asset type %s", //getKey
         //Loader: 4900
-        "4900": "Sorry, the 'resources://' protocol is obsoleted, use cc.loader.loadRes instead please.", //load
         "4901": "loadRes: should not specify the extname in %s %s", //_getResUuid
         "4902": "No need to release non-cached asset.", //setAutoRelease
         "4903": "Can not get class '%s'", //uuid-loader.loadUuid
@@ -393,6 +428,8 @@ if (CC_DEV) {
         "4918": "cc.LabelBMFont._parseCommonArguments(): only supports 1 page", //loadFnt
         "4919": "cc.LabelBMFont._parseImageFileName() : file could not be found", //loadFnt
         "4920": "Sorry, you shouldn\'t use id as item identity any more, please use url or uuid instead, the current id is being set as url: (%s)", // load
+        "4921": "Invalid pipe or invalid index provided!", //pipeline.insertPipe
+        "4922": "The pipe to be inserted is already in the pipeline!", //pipeline.insertPipe
         //CCObject: 5000
         "5000": "object already destroyed", //destroy
         "5001": "object not yet destroyed", //realDestroyInEditor
@@ -412,7 +449,7 @@ if (CC_DEV) {
         "5403": "cc.js.mixin: arguments must be type object: ", //mixin
         "5404": "The base class to extend from must be non-nil", //extend
         "5405": "The class to extend must be non-nil", //extend
-        "5406": "Class should be extended before assigning any prototype members.", //extend                
+        "5406": "Class should be extended before assigning any prototype members.", //extend
         //PreprocessAttrs: 5500
         "5500": "'notify' can\'t work with 'get/set' !", //parseNotify
         "5501": "'notify' must work with 'default' !", //parseNotify_2
@@ -425,18 +462,18 @@ if (CC_DEV) {
         "5508": "Invalid type of %s.%s", //parseType_2
         "5509": "The 'type' attribute of '%s.%s' must be child class of cc.Asset, otherwise you should use 'url: %s' instead", //parseType_3
         "5510": "The 'type' attribute of '%s.%s' can not be 'Number', use 'Float' or 'Integer' instead please.", //parseType_4
-        "5511": "The 'type' attribute of '%s.%s' is undefined when loading script", //parseType_5                              
+        "5511": "The 'type' attribute of '%s.%s' is undefined when loading script", //parseType_5
         "5512": "Can not serialize '%s.%s' because the specified type is anonymous, please provide a class name or set the 'serializable' attribute of '%s.%s' to 'false'.", //postCheckType
         "5513": "The 'default' value of '%s.%s' should not be used with a 'get' function.", //default
         "5514": "The 'default' value of '%s.%s' should not be used with a 'set' function.", //default_2
         "5515": "The 'default' value of '%s.%s' can not be an constructor. Set default to null please.", //default_3
         "5516": "Property '%s.%s' must define at least one of 'default', 'get' or 'set'.", //default_4
-        "5517": "'%s.%s' hides inherited property '%s.%s'. To make the current property override that implementation, add the `override: true` attribute please.", //default_5                              
+        "5517": "'%s.%s' hides inherited property '%s.%s'. To make the current property overwrite that implementation, add the `override: true` attribute please.", //default_5
         //Find: 5600
         "5600": "Argument must be non-nil", //find
         "5601": "Can not get current scene.", //find_2
         "5602": "Scene is destroyed", //find_3
-        "5603": "reference node is destroyed", //find_4                      
+        "5603": "reference node is destroyed", //find_4
         //Misc: 5700
         "5700": "no %s or %s on %s", //misc
         //ValueType: 5800
@@ -499,7 +536,7 @@ if (CC_DEV) {
         //Url: 7000
         "7000": "Failed to init asset\'s raw path.", //raw
         "7001": "Should not load '%s' from script dynamically, unless it is placed in the 'resources' folder.", //raw
-        "7002": "Sorry can not load '%s' because it is not placed in the 'resources' folder.", //raw                 
+        "7002": "Sorry can not load '%s' because it is not placed in the 'resources' folder.", //raw
         "7003": "Failed to init builtin asset\'s raw path.", //builtinRaw
         //Enum: 7100
         "7100": "%s already defined in Enum.", //Enum
@@ -525,9 +562,10 @@ if (CC_DEV) {
         "7217": "cocos2d: TMXFomat: Unsupported orientation: %s", //parseXMLFile
         "7218": "cc.TMXMapInfo.parseXMLFile(): unsupported compression method", //_parseLayer
         "7219": "cc.TMXMapInfo.parseXMLFile(): Only base64 and/or gzip/zlib maps are supported", //_parseLayer
+        "7220": "TMX Parser: please load the xml resource first: %s", // parseXMLFile
         //Wrapper: 7300
         "7300": "The new selected must be number", //CheckBox.selected
-        "7301": "The new bake must be boolean", //layer        
+        "7301": "The new bake must be boolean", //layer
         //ArmatureDisplay: 7400
         "7400": "Failed to set _defaultArmatureIndex for '%s' because its dragonAsset is invalid.", //_defaultArmatureIndex
         "7401": "Failed to set _defaultArmatureIndex for '%s' because the index is out of range.", //_defaultArmatureIndex
@@ -536,7 +574,7 @@ if (CC_DEV) {
         "7500": "Failed to set _defaultSkinIndex for '%s' because its skeletonData is invalid.", //_defaultSkinIndex
         "7501": "Failed to set _defaultSkinIndex for '%s' because the index is out of range.", //_defaultSkinIndex
         "7502": "Failed to set _animationIndex for '%s' because its skeletonData is invalid.", //_animationIndex
-        "7503": "Failed to set _animationIndex for '%s' because the index is out of range.", //_animationIndex        
+        "7503": "Failed to set _animationIndex for '%s' because the index is out of range.", //_animationIndex
         "7504": "Can not render dynamic created SkeletonData", //_createSgNode
         "7505": "Invalid type of atlasFile, atlas should be registered as raw asset.", //_createSgNode
         "7506": "Failed to load spine atlas '$s'", //TextureLoader.load
@@ -578,13 +616,20 @@ if (CC_DEV) {
         "8103": "cc.GLProgram.link(): Cannot link invalid program", //link
         "8104": "cocos2d: ERROR: Failed to link program: %s", //link
         "8105": "cocos2d: cc.shaderCache._loadDefaultShader, error shader type", //_loadDefaultShader
+        //Physics: 8200
+        "8200": "Please set node\'s active instead of rigidbody\'s enabled.", //cc.RigidBody.enabled
+        //Camera: 8300
+        "8300": "Should only one camera exists, please check your project.", //cc.Camera.enabled
+        "8301": "Camera does not support Canvas Mode.", //cc.Camera.enabled
+        // AudioEngine: 8400
+        "8400": "Wrong type arguments, 'filePath' must be a String.", // cc.audioEngine.play
     };
     cc._LogInfos = logs;
 }
 
 // module.exports = false;
 
-// // Only Node.JS has a process variable that is of [[Class]] process 
+// // Only Node.JS has a process variable that is of [[Class]] process
 // try {
 //     module.exports = Object.prototype.toString.call(global.process) === '[object process]';
 //     module.exports = logs;

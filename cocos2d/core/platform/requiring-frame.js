@@ -50,7 +50,7 @@ cc._RF = {
                 return;
             }
             // auto export component
-        module.exports = exports = frameInfo.beh;
+            module.exports = exports = frameInfo.cls;
         }
     },
     peek: function () {
@@ -62,11 +62,4 @@ if (CC_EDITOR) {
     cc._RF.reset = function () {
         requiringFrames = [];
     };
-}
-
-cc._RFpush = cc._RF.push;
-cc._RFpop = cc._RF.pop;
-cc._RFpeek = cc._RF.peek;
-if (CC_EDITOR) {
-    cc._RFreset = cc._RF.reset;
 }

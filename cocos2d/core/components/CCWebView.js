@@ -20,7 +20,7 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  ****************************************************************************/
-
+require('../webview/CCSGWebView');
 /**
  * !#en WebView event type
  * !#zh 网页视图事件类型
@@ -46,6 +46,9 @@ var EventType = _ccsg.WebView.EventType;
  * !#zh  网页加载出错
  * @property {String} ERROR
  */
+
+//
+function emptyCallback () { }
 
 /**
  * !#en cc.WebView is a component for display web pages in the game
@@ -100,14 +103,14 @@ var WebView = cc.Class({
         EventType: EventType,
     },
 
-    onLoad: CC_JSB && function() {
+    onLoad: CC_JSB && function () {
         if (cc.sys.os === cc.sys.OS_OSX || cc.sys.os === cc.sys.OS_WINDOWS) {
             this.enabled = false;
         }
     },
 
     _createSgNode: function () {
-        if(CC_JSB) {
+        if (CC_JSB) {
             if (cc.sys.os === cc.sys.OS_OSX || cc.sys.os === cc.sys.OS_WINDOWS) {
                 console.log('WebView is not supported on Mac and Windows!');
                 return null;
@@ -120,20 +123,38 @@ var WebView = cc.Class({
         var sgNode = this._sgNode;
         if (!sgNode) return;
 
-        if(!CC_JSB) {
+        if (!CC_JSB) {
             sgNode.createDomElementIfNeeded();
         }
-        sgNode.setEventListener(EventType.LOADED , this._onWebViewLoaded.bind(this));
-        sgNode.setEventListener(EventType.LOADING , this._onWebViewLoading.bind(this));
-        sgNode.setEventListener(EventType.ERROR , this._onWebViewLoadError.bind(this));
 
         sgNode.loadURL(this._url);
 
         if (CC_EDITOR && this._useOriginalSize) {
             this.node.setContentSize(sgNode.getContentSize());
             this._useOriginalSize = false;
-        } else {
+        }
+        else {
             sgNode.setContentSize(this.node.getContentSize());
+        }
+    },
+
+    onEnable: function () {
+        this._super();
+        if (!CC_EDITOR) {
+            var sgNode = this._sgNode;
+            sgNode.setEventListener(EventType.LOADED, this._onWebViewLoaded.bind(this));
+            sgNode.setEventListener(EventType.LOADING, this._onWebViewLoading.bind(this));
+            sgNode.setEventListener(EventType.ERROR, this._onWebViewLoadError.bind(this));
+        }
+    },
+
+    onDisable: function () {
+        this._super();
+        if (!CC_EDITOR) {
+            var sgNode = this._sgNode;
+            sgNode.setEventListener(EventType.LOADED, emptyCallback);
+            sgNode.setEventListener(EventType.LOADING, emptyCallback);
+            sgNode.setEventListener(EventType.ERROR, emptyCallback);
         }
     },
 
@@ -151,7 +172,61 @@ var WebView = cc.Class({
     _onWebViewLoadError: function () {
         cc.Component.EventHandler.emitEvents(this.webviewEvents, this, EventType.ERROR);
         this.node.emit('error', this);
-    }
+    },
+
+    /**
+     * !#en
+     * Set javascript interface scheme (see also setOnJSCallback). <br/>
+     * Note: Supports only on the Android and iOS. For HTML5, please refer to the official documentation.<br/>
+     * Please refer to the official documentation for more details.
+     * !#zh
+     * 设置 JavaScript 接口方案（与 'setOnJSCallback' 配套使用）。<br/>
+     * 注意：只支持 Android 和 iOS ，Web 端用法请前往官方文档查看。<br/>
+     * 详情请参阅官方文档
+     * @method setJavascriptInterfaceScheme
+     * @param {String} scheme
+     */
+    setJavascriptInterfaceScheme: function (scheme) {
+        if (this._sgNode) {
+            this._sgNode.setJavascriptInterfaceScheme(scheme);
+        }
+    },
+
+    /**
+     * !#en
+     * This callback called when load URL that start with javascript
+     * interface scheme (see also setJavascriptInterfaceScheme). <br/>
+     * Note: Supports only on the Android and iOS. For HTML5, please refer to the official documentation.<br/>
+     * Please refer to the official documentation for more details.
+     * !#zh
+     * 当加载 URL 以 JavaScript 接口方案开始时调用这个回调函数。<br/>
+     * 注意：只支持 Android 和 iOS，Web 端用法请前往官方文档查看。
+     * 详情请参阅官方文档
+     * @method setOnJSCallback
+     * @param {Function} callback
+     */
+    setOnJSCallback: function (callback) {
+        if (this._sgNode) {
+            this._sgNode.setOnJSCallback(callback);
+        }
+    },
+
+    /**
+     * !#en
+     * Evaluates JavaScript in the context of the currently displayed page. <br/>
+     * Please refer to the official document for more details <br/>
+     * Note: Cross domain issues need to be resolved by yourself <br/>
+     * !#zh
+     * 执行 WebView 内部页面脚本（详情请参阅官方文档） <br/>
+     * 注意：需要自行解决跨域问题
+     * @method evaluateJS
+     * @param {String} str
+     */
+    evaluateJS: function (str) {
+        if (this._sgNode) {
+            this._sgNode.evaluateJS(str);
+        }
+    },
 
 });
 
@@ -162,7 +237,7 @@ cc.WebView = module.exports = WebView;
  * !#zh
  * 注意：此事件是从该组件所属的 Node 上面派发出来的，需要用 node.on 来监听。
  * @event loaded
- * @param {Event} event
+ * @param {Event.EventCustom} event
  * @param {WebView} event.detail - The WebView component.
  */
 
@@ -172,7 +247,7 @@ cc.WebView = module.exports = WebView;
  * !#zh
  * 注意：此事件是从该组件所属的 Node 上面派发出来的，需要用 node.on 来监听。
  * @event loading
- * @param {Event} event
+ * @param {Event.EventCustom} event
  * @param {WebView} event.detail - The WebView component.
  */
 
@@ -182,6 +257,20 @@ cc.WebView = module.exports = WebView;
  * !#zh
  * 注意：此事件是从该组件所属的 Node 上面派发出来的，需要用 node.on 来监听。
  * @event error
- * @param {Event} event
+ * @param {Event.EventCustom} event
  * @param {WebView} event.detail - The WebView component.
+ */
+
+/**
+ * !#en if you don't need the WebView and it isn't in any running Scene, you should
+ * call the destroy method on this component or the associated node explicitly.
+ * Otherwise, the created DOM element won't be removed from web page.
+ * !#zh
+ * 如果你不再使用 WebView，并且组件未添加到场景中，那么你必须手动对组件或所在节点调用 destroy。
+ * 这样才能移除网页上的 DOM 节点，避免 Web 平台内存泄露。
+ * @example
+ * webview.node.parent = null;  // or  webview.node.removeFromParent(false);
+ * // when you don't need webview anymore
+ * webview.node.destroy();
+ * @method destroy
  */

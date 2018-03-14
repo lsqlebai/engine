@@ -77,17 +77,20 @@ math.glFreeAll = function () {
 
 math.glPushMatrix = function () {
     cc.current_stack.push(cc.current_stack.top);
+    cc.current_stack.update();
 };
 
 math.glPushMatrixWitMat4 = function (saveMat) {
     cc.current_stack.stack.push(cc.current_stack.top);
     saveMat.assignFrom(cc.current_stack.top);
     cc.current_stack.top = saveMat;
+    cc.current_stack.update();
 };
 
 math.glPopMatrix = function () {
     //No need to lazy initialize, you shouldnt be popping first anyway!
     cc.current_stack.top = cc.current_stack.stack.pop();
+    cc.current_stack.update();
 };
 
 math.glMatrixMode = function (mode) {
@@ -106,22 +109,24 @@ math.glMatrixMode = function (mode) {
             throw new Error("Invalid matrix mode specified");   //TODO: Proper error handling
             break;
     }
-    cc.current_stack.lastUpdated = cc.director.getTotalFrames();
 };
 
 math.glLoadIdentity = function () {
     //lazyInitialize();
     cc.current_stack.top.identity(); //Replace the top matrix with the identity matrix
+    cc.current_stack.update();
 };
 
 math.glLoadMatrix = function (pIn) {
     //lazyInitialize();
     cc.current_stack.top.assignFrom(pIn);
+    cc.current_stack.update();
 };
 
 math.glMultMatrix = function (pIn) {
     //lazyInitialize();
     cc.current_stack.top.multiply(pIn);
+    cc.current_stack.update();
 };
 
 var tempMatrix = new math.Matrix4();    //an internal matrix
@@ -131,6 +136,7 @@ math.glTranslatef = function (x, y, z) {
 
     //Multiply the rotation matrix by the current matrix
     cc.current_stack.top.multiply(translation);
+    cc.current_stack.update();
 };
 
 var tempVector3 = new math.Vec3();
@@ -141,11 +147,13 @@ math.glRotatef = function (angle, x, y, z) {
 
     //Multiply the rotation matrix by the current matrix
     cc.current_stack.top.multiply(rotation);
+    cc.current_stack.update();
 };
 
 math.glScalef = function (x, y, z) {
     var scaling = math.Matrix4.createByScale(x, y, z, tempMatrix);
     cc.current_stack.top.multiply(scaling);
+    cc.current_stack.update();
 };
 
 math.glGetMatrix = function (mode, pOut) {

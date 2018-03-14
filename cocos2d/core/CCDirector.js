@@ -1,7 +1,7 @@
 /****************************************************************************
  Copyright (c) 2008-2010 Ricardo Quesada
  Copyright (c) 2011-2012 cocos2d-x.org
- Copyright (c) 2013-2014 Chukong Technologies Inc.
+ Copyright (c) 2013-2017 Chukong Technologies Inc.
 
  http://www.cocos2d-x.org
 
@@ -27,6 +27,10 @@
 var EventTarget = require('./event/event-target');
 var Class = require('./platform/_CCClass');
 var AutoReleaseUtils = require('./load-pipeline/auto-release-utils');
+var ComponentScheduler = require('./component-scheduler');
+var NodeActivator = require('./node-activator');
+var EventListeners = require('./event/event-listeners');
+var eventManager = require('./event-manager');
 
 cc.g_NumberOfDraws = 0;
 
@@ -98,81 +102,76 @@ cc.g_NumberOfDraws = 0;
  * </p>
  *
  * @class Director
+ * @extends EventTarget
  */
 cc.Director = Class.extend(/** @lends cc.Director# */{
-    //Variables
-    _landscape: false,
-    _nextDeltaTimeZero: false,
-    _paused: false,
-    _purgeDirectorInNextLoop: false,
-    _sendCleanupToScene: false,
-    _animationInterval: 0.0,
-    _oldAnimationInterval: 0.0,
-    _projection: 0,
-    _contentScaleFactor: 1.0,
-
-    _deltaTime: 0.0,
-
-    _winSizeInPoints: null,
-
-    _lastUpdate: null,
-    _nextScene: null,
-    _openGLView: null,
-    _scenesStack: null,
-    _projectionDelegate: null,
-
-    _loadingScene: '',
-    _runningScene: null,    // The root of rendering scene graph
-
-    // The entity-component scene
-    _scene: null,
-
-    _totalFrames: 0,
-    _secondsPerFrame: 0,
-
-    _dirtyRegion: null,
-
-    _scheduler: null,
-    _actionManager: null,
-
     ctor: function () {
         var self = this;
-
         EventTarget.call(self);
+
+        self._landscape = false;
+        self._nextDeltaTimeZero = false;
+        // paused?
+        self._paused = false;
+        // purge?
+        self._purgeDirectorInNextLoop = false;
+        self._sendCleanupToScene = false;
+        self._animationInterval = 0.0;
+        self._oldAnimationInterval = 0.0;
+        self._projection = 0;
+        // projection delegate if "Custom" projection is used
+        self._projectionDelegate = null;
+        self._contentScaleFactor = 1.0;
+
+        self._winSizeInPoints = null;
+
+        self._openGLView = null;
+        // scenes
+        self._scenesStack = null;
+        self._nextScene = null;
+        self._loadingScene = '';
+        self._runningScene = null;    // The root of rendering scene graph
+
+        // The entity-component scene
+        self._scene = null;
+
+        // FPS
+        self._totalFrames = 0;
         self._lastUpdate = Date.now();
+        self._deltaTime = 0.0;
+
+        self._dirtyRegion = null;
+
+        // Scheduler for user registration update
+        self._scheduler = null;
+        // Scheduler for life-cycle methods in component
+        self._compScheduler = null;
+        // Node activator
+        self._nodeActivator = null;
+        // Action manager
+        self._actionManager = null;
+
         cc.game.on(cc.game.EVENT_SHOW, function () {
             self._lastUpdate = Date.now();
         });
     },
 
     init: function () {
-        // scenes
         this._oldAnimationInterval = this._animationInterval = 1.0 / cc.defaultFPS;
         this._scenesStack = [];
         // Set default projection (3D)
         this._projection = cc.Director.PROJECTION_DEFAULT;
-        // projection delegate if "Custom" projection is used
-        this._projectionDelegate = null;
 
-        // FPS
+        this._projectionDelegate = null;
         this._totalFrames = 0;
         this._lastUpdate = Date.now();
-
-        //Paused?
         this._paused = false;
-
-        //purge?
         this._purgeDirectorInNextLoop = false;
-
         this._winSizeInPoints = cc.size(0, 0);
-
         this._openGLView = null;
         this._contentScaleFactor = 1.0;
-
-        // Scheduler for user registration update
         this._scheduler = new cc.Scheduler();
 
-        // Action manager
         if (cc.ActionManager) {
             this._actionManager = new cc.ActionManager();
             this._scheduler.scheduleUpdate(this._actionManager, cc.Scheduler.PRIORITY_SYSTEM, false);
@@ -181,7 +180,6 @@ cc.Director = Class.extend(/** @lends cc.Director# */{
         }
 
         this.sharedInit();
-
         return true;
     },
 
@@ -190,6 +188,9 @@ cc.Director = Class.extend(/** @lends cc.Director# */{
      * All platform independent init process should be occupied here.
      */
     sharedInit: function () {
+        this._compScheduler = new ComponentScheduler();
+        this._nodeActivator = new NodeActivator();
+
         // Animation manager
         if (cc.AnimationManager) {
             this._animationManager = new cc.AnimationManager();
@@ -208,10 +209,21 @@ cc.Director = Class.extend(/** @lends cc.Director# */{
             this._collisionManager = null;
         }
 
+        // physics manager
+        if (cc.PhysicsManager) {
+            this._physicsManager = new cc.PhysicsManager();
+            this._scheduler.scheduleUpdate(this._physicsManager, cc.Scheduler.PRIORITY_SYSTEM, false);
+        }
+        else {
+            this._physicsManager = null;
+        }
+
         // WidgetManager
         if (cc._widgetManager) {
             cc._widgetManager.init(this);
         }
+
+        cc.loader.init(this);
     },
 
     /**
@@ -243,13 +255,13 @@ cc.Director = Class.extend(/** @lends cc.Director# */{
      * @return {Vec2}
      */
     convertToGL: function (uiPoint) {
-        var docElem = document.documentElement;
+        var container = cc.game.container;
         var view = cc.view;
-        var box = docElem.getBoundingClientRect();
-        box.left += window.pageXOffset - docElem.clientLeft;
-        box.top += window.pageYOffset - docElem.clientTop;
-        var x = view._devicePixelRatio * (uiPoint.x - box.left);
-        var y = view._devicePixelRatio * (box.top + box.height - uiPoint.y);
+        var box = container.getBoundingClientRect();
+        var left = box.left + window.pageXOffset - container.clientLeft;
+        var top = box.top + window.pageYOffset - container.clientTop;
+        var x = view._devicePixelRatio * (uiPoint.x - left);
+        var y = view._devicePixelRatio * (top + box.height - uiPoint.y);
         return view._isRotated ? {x: view._viewPortRect.width - y, y: x} : {x: x, y: y};
     },
 
@@ -264,19 +276,19 @@ cc.Director = Class.extend(/** @lends cc.Director# */{
      * @return {Vec2}
      */
     convertToUI: function (glPoint) {
-        var docElem = document.documentElement;
+        var container = cc.game.container;
         var view = cc.view;
-        var box = docElem.getBoundingClientRect();
-        box.left += window.pageXOffset - docElem.clientLeft;
-        box.top += window.pageYOffset - docElem.clientTop;
+        var box = container.getBoundingClientRect();
+        var left = box.left + window.pageXOffset - container.clientLeft;
+        var top = box.top + window.pageYOffset - container.clientTop;
         var uiPoint = {x: 0, y: 0};
         if (view._isRotated) {
-            uiPoint.x = box.left + glPoint.y / view._devicePixelRatio;
-            uiPoint.y = box.top + box.height - (view._viewPortRect.width - glPoint.x) / view._devicePixelRatio;
+            uiPoint.x = left + glPoint.y / view._devicePixelRatio;
+            uiPoint.y = top + box.height - (view._viewPortRect.width - glPoint.x) / view._devicePixelRatio;
         }
         else {
-            uiPoint.x = box.left + glPoint.x / view._devicePixelRatio;
-            uiPoint.y = box.top + box.height - glPoint.y / view._devicePixelRatio;
+            uiPoint.x = left + glPoint.x * view._devicePixelRatio;
+            uiPoint.y = top + box.height - glPoint.y * view._devicePixelRatio;
         }
         return uiPoint;
     },
@@ -335,9 +347,13 @@ cc.Director = Class.extend(/** @lends cc.Director# */{
      * Returns the size of the OpenGL view in pixels.<br/>
      * It takes into account any possible rotation (device orientation) of the window.<br/>
      * On Mac winSize and winSizeInPixels return the same value.
-     * !#zh 获取视图大小，以像素为单位。
+     * (The pixel here refers to the resource resolution. If you want to get the physics resolution of device, you need to use cc.view.getFrameSize())
+     * !#zh
+     * 获取视图大小，以像素为单位（这里的像素指的是资源分辨率。
+     * 如果要获取屏幕物理分辨率，需要用 cc.view.getFrameSize()）
      * @method getWinSizeInPixels
      * @return {Size}
+     * @deprecated
      */
     getWinSizeInPixels: function () {
         return cc.size(this._winSizeInPoints.width * this._contentScaleFactor, this._winSizeInPoints.height * this._contentScaleFactor);
@@ -416,6 +432,7 @@ cc.Director = Class.extend(/** @lends cc.Director# */{
      */
     purgeCachedData: function () {
         cc.textureCache._clear();
+        cc.loader.releaseAll();
     },
 
     /**
@@ -424,10 +441,13 @@ cc.Director = Class.extend(/** @lends cc.Director# */{
     purgeDirector: function () {
         //cleanup scheduler
         this.getScheduler().unscheduleAll();
+        this._compScheduler.unscheduleAll();
+
+        this._nodeActivator.reset();
 
         // Disable event dispatching
-        if (cc.eventManager)
-            cc.eventManager.setEnabled(false);
+        if (eventManager)
+            eventManager.setEnabled(false);
 
         // don't release the event handlers
         // They are needed in case the director is run again
@@ -452,7 +472,8 @@ cc.Director = Class.extend(/** @lends cc.Director# */{
         // Clear all caches
         this.purgeCachedData();
 
-        cc.checkGLErrorDebug();
+        if (CC_DEV)
+            cc.checkGLErrorDebug();
     },
 
     /**
@@ -461,8 +482,8 @@ cc.Director = Class.extend(/** @lends cc.Director# */{
     reset: function () {
         this.purgeDirector();
 
-        if (cc.eventManager)
-            cc.eventManager.setEnabled(true);
+        if (eventManager)
+            eventManager.setEnabled(true);
 
         // Action manager
         if (this._actionManager){
@@ -477,6 +498,11 @@ cc.Director = Class.extend(/** @lends cc.Director# */{
         // Collider manager
         if (this._collisionManager) {
             this._scheduler.scheduleUpdate(this._collisionManager, cc.Scheduler.PRIORITY_SYSTEM, false);
+        }
+
+        // Physics manager
+        if (this._physicsManager) {
+            this._scheduler.scheduleUpdate(this._physicsManager, cc.Scheduler.PRIORITY_SYSTEM, false);
         }
 
         this.startAnimation();
@@ -517,16 +543,19 @@ cc.Director = Class.extend(/** @lends cc.Director# */{
      * @param {Function} [onLaunched] - The function invoked at the scene after launch.
      */
     runSceneImmediate: function (scene, onBeforeLoadScene, onLaunched) {
-        var id, node, game = cc.game;
-        var persistNodes = game._persistRootNodes;
-
         if (scene instanceof cc.Scene) {
+            CC_BUILD && CC_DEBUG && console.time('InitScene');
             scene._load();  // ensure scene initialized
+            CC_BUILD && CC_DEBUG && console.timeEnd('InitScene');
         }
 
         // detach persist nodes
-        for (id in persistNodes) {
-            node = persistNodes[id];
+        var game = cc.game;
+        var persistNodeList = Object.keys(game._persistRootNodes).map(function (x) {
+            return game._persistRootNodes[x];
+        });
+        for (let i = 0; i < persistNodeList.length; i++) {
+            let node = persistNodeList[i];
             game._ignoreRemovePersistNode = node;
             node.parent = null;
             game._ignoreRemovePersistNode = null;
@@ -536,11 +565,14 @@ cc.Director = Class.extend(/** @lends cc.Director# */{
 
         if (!CC_EDITOR) {
             // auto release assets
+            CC_BUILD && CC_DEBUG && console.time('AutoRelease');
             var autoReleaseAssets = oldScene && oldScene.autoReleaseAssets && oldScene.dependAssets;
-            AutoReleaseUtils.autoRelease(cc.loader, autoReleaseAssets, scene.dependAssets);
+            AutoReleaseUtils.autoRelease(autoReleaseAssets, scene.dependAssets, persistNodeList);
+            CC_BUILD && CC_DEBUG && console.timeEnd('AutoRelease');
         }
 
         // unload scene
+        CC_BUILD && CC_DEBUG && console.time('Destroy');
         if (cc.isValid(oldScene)) {
             oldScene.destroy();
         }
@@ -549,6 +581,7 @@ cc.Director = Class.extend(/** @lends cc.Director# */{
 
         // purge destroyed nodes belongs to old scene
         cc.Object._deferredDestroy();
+        CC_BUILD && CC_DEBUG && console.timeEnd('Destroy');
 
         if (onBeforeLoadScene) {
             onBeforeLoadScene();
@@ -563,21 +596,24 @@ cc.Director = Class.extend(/** @lends cc.Director# */{
             sgScene = scene._sgNode;
 
             // Re-attach or replace persist nodes
-            for (id in persistNodes) {
-                node = persistNodes[id];
-                var existNode = scene.getChildByUuid(id);
+            CC_BUILD && CC_DEBUG && console.time('AttachPersist');
+            for (let i = 0; i < persistNodeList.length; i++) {
+                let node = persistNodeList[i];
+                var existNode = scene.getChildByUuid(node.uuid);
                 if (existNode) {
                     // scene also contains the persist node, select the old one
                     var index = existNode.getSiblingIndex();
                     existNode._destroyImmediate();
-                    node.parent = scene;
-                    node.setSiblingIndex(index);
+                    scene.insertChild(node, index);
                 }
                 else {
                     node.parent = scene;
                 }
             }
+            CC_BUILD && CC_DEBUG && console.timeEnd('AttachPersist');
+            CC_BUILD && CC_DEBUG && console.time('Activate');
             scene._activate();
+            CC_BUILD && CC_DEBUG && console.timeEnd('Activate');
         }
 
         // Run or replace rendering scene
@@ -767,7 +803,9 @@ cc.Director = Class.extend(/** @lends cc.Director# */{
             }
         }
         //cc.AssetLibrary.unloadAsset(uuid);     // force reload
+        console.time('LoadScene ' + uuid);
         cc.AssetLibrary.loadAsset(uuid, function (error, sceneAsset) {
+            console.timeEnd('LoadScene ' + uuid);
             var self = cc.director;
             self._loadingScene = '';
             if (error) {
@@ -849,9 +887,11 @@ cc.Director = Class.extend(/** @lends cc.Director# */{
 
     /**
      * !#en
-     * set color for clear screen.<br/>
-     * Implementation can be found in CCDirectorCanvas.js/CCDirectorWebGL.js
-     * !#zh 设置场景的默认擦除颜色（支持白色全透明，但不支持透明度为中间值）。
+     * Set color for clear screen.<br/>
+     * (Implementation can be found in CCDirectorCanvas.js/CCDirectorWebGL.js)
+     * !#zh
+     * 设置场景的默认擦除颜色。<br/>
+     * 支持全透明，但不支持透明度为中间值。要支持全透明需手工开启 cc.macro.ENABLE_TRANSPARENT_CANVAS。
      * @method setClearColor
      * @param {Color} clearColor
      */
@@ -1052,17 +1092,8 @@ cc.Director = Class.extend(/** @lends cc.Director# */{
     setDisplayStats: function (displayStats) {
         if (cc.profiler) {
             displayStats ? cc.profiler.showStats() : cc.profiler.hideStats();
+            cc.game.config[cc.game.CONFIG_KEY.showFPS] = !!displayStats;
         }
-    },
-
-    /**
-     * !#en Returns seconds per frame.
-     * !#zh 获取实际记录的上一帧执行时间，可能与单位帧执行时间（AnimationInterval）有出入。
-     * @method getSecondsPerFrame
-     * @return {Number}
-     */
-    getSecondsPerFrame: function () {
-        return this._secondsPerFrame;
     },
 
     /**
@@ -1178,7 +1209,11 @@ cc.Director = Class.extend(/** @lends cc.Director# */{
      */
     setActionManager: function (actionManager) {
         if (this._actionManager !== actionManager) {
+            if (this._actionManager) {
+                this._scheduler.unscheduleUpdate(this._actionManager);
+            }
             this._actionManager = actionManager;
+            this._scheduler.scheduleUpdate(this._actionManager, cc.Scheduler.PRIORITY_SYSTEM, false);
         }
     },
 
@@ -1202,6 +1237,15 @@ cc.Director = Class.extend(/** @lends cc.Director# */{
     },
 
     /**
+     * Returns the cc.PhysicsManager associated with this director.
+     * @method getPhysicsManager
+     * @return {PhysicsManager}
+     */
+    getPhysicsManager: function () {
+        return this._physicsManager;
+    },
+
+    /**
      * !#en Returns the delta time since last frame.
      * !#zh 获取上一帧的 “delta time”。
      * @method getDeltaTime
@@ -1210,11 +1254,6 @@ cc.Director = Class.extend(/** @lends cc.Director# */{
     getDeltaTime: function () {
         return this._deltaTime;
     },
-
-    _calculateMPF: function () {
-        var now = Date.now();
-        this._secondsPerFrame = (now - this._lastUpdate) / 1000;
-    }
 });
 
 // Event target
@@ -1224,11 +1263,18 @@ cc.js.addon(cc.Director.prototype, EventTarget.prototype);
  * !#en The event projection changed of cc.Director.
  * !#zh cc.Director 投影变化的事件。
  * @event cc.Director.EVENT_PROJECTION_CHANGED
- * @param {Event} event
+ * @param {Event.EventCustom} event
  * @example
  *   cc.director.on(cc.Director.EVENT_PROJECTION_CHANGED, function(event) {
  *      cc.log("Projection changed.");
  *   });
+ */
+/**
+ * !#en The event projection changed of cc.Director.
+ * !#zh cc.Director 投影变化的事件。
+ * @property {String} EVENT_PROJECTION_CHANGED
+ * @readonly
+ * @static
  */
 cc.Director.EVENT_PROJECTION_CHANGED = "director_projection_changed";
 
@@ -1236,8 +1282,15 @@ cc.Director.EVENT_PROJECTION_CHANGED = "director_projection_changed";
  * !#en The event which will be triggered before loading a new scene.
  * !#zh 加载新场景之前所触发的事件。
  * @event cc.Director.EVENT_BEFORE_SCENE_LOADING
- * @param {Event} event
+ * @param {Event.EventCustom} event
  * @param {Vec2} event.detail - The loading scene name
+ */
+/**
+ * !#en The event which will be triggered before loading a new scene.
+ * !#zh 加载新场景之前所触发的事件。
+ * @property {String} EVENT_BEFORE_SCENE_LOADING
+ * @readonly
+ * @static
  */
 cc.Director.EVENT_BEFORE_SCENE_LOADING = "director_before_scene_loading";
 
@@ -1245,8 +1298,15 @@ cc.Director.EVENT_BEFORE_SCENE_LOADING = "director_before_scene_loading";
  * !#en The event which will be triggered before launching a new scene.
  * !#zh 运行新场景之前所触发的事件。
  * @event cc.Director.EVENT_BEFORE_SCENE_LAUNCH
- * @param {Event} event
+ * @param {Event.EventCustom} event
  * @param {Vec2} event.detail - New scene which will be launched
+ */
+/**
+ * !#en The event which will be triggered before launching a new scene.
+ * !#zh 运行新场景之前所触发的事件。
+ * @property {String} EVENT_BEFORE_SCENE_LAUNCH
+ * @readonly
+ * @static
  */
 cc.Director.EVENT_BEFORE_SCENE_LAUNCH = "director_before_scene_launch";
 
@@ -1254,8 +1314,15 @@ cc.Director.EVENT_BEFORE_SCENE_LAUNCH = "director_before_scene_launch";
  * !#en The event which will be triggered after launching a new scene.
  * !#zh 运行新场景之后所触发的事件。
  * @event cc.Director.EVENT_AFTER_SCENE_LAUNCH
- * @param {Event} event
+ * @param {Event.EventCustom} event
  * @param {Vec2} event.detail - New scene which is launched
+ */
+/**
+ * !#en The event which will be triggered after launching a new scene.
+ * !#zh 运行新场景之后所触发的事件。
+ * @property {String} EVENT_AFTER_SCENE_LAUNCH
+ * @readonly
+ * @static
  */
 cc.Director.EVENT_AFTER_SCENE_LAUNCH = "director_after_scene_launch";
 
@@ -1263,33 +1330,29 @@ cc.Director.EVENT_AFTER_SCENE_LAUNCH = "director_after_scene_launch";
  * !#en The event which will be triggered at the beginning of every frame.
  * !#zh 每个帧的开始时所触发的事件。
  * @event cc.Director.EVENT_BEFORE_UPDATE
- * @param {Event} event
+ * @param {Event.EventCustom} event
+ */
+/**
+ * !#en The event which will be triggered at the beginning of every frame.
+ * !#zh 每个帧的开始时所触发的事件。
+ * @property {String} EVENT_BEFORE_UPDATE
+ * @readonly
+ * @static
  */
 cc.Director.EVENT_BEFORE_UPDATE = "director_before_update";
-
-/**
- * !#en The event which will be triggered after components update.
- * !#zh 组件 “update” 时所触发的事件。
- * @event cc.Director.EVENT_COMPONENT_UPDATE
- * @param {Event} event
- * @param {Vec2} event.detail - The delta time from last frame
- */
-cc.Director.EVENT_COMPONENT_UPDATE = "director_component_update";
-
-/**
- * !#en The event which will be triggered after components late update.
- * !#zh 组件 “late update” 时所触发的事件。
- * @event cc.Director.EVENT_COMPONENT_LATE_UPDATE
- * @param {Event} event
- * @param {Vec2} event.detail - The delta time from last frame
- */
-cc.Director.EVENT_COMPONENT_LATE_UPDATE = "director_component_late_update";
 
 /**
  * !#en The event which will be triggered after engine and components update logic.
  * !#zh 将在引擎和组件 “update” 逻辑之后所触发的事件。
  * @event cc.Director.EVENT_AFTER_UPDATE
- * @param {Event} event
+ * @param {Event.EventCustom} event
+ */
+/**
+ * !#en The event which will be triggered after engine and components update logic.
+ * !#zh 将在引擎和组件 “update” 逻辑之后所触发的事件。
+ * @property {String} EVENT_AFTER_UPDATE
+ * @readonly
+ * @static
  */
 cc.Director.EVENT_AFTER_UPDATE = "director_after_update";
 
@@ -1297,7 +1360,14 @@ cc.Director.EVENT_AFTER_UPDATE = "director_after_update";
  * !#en The event which will be triggered before visiting the rendering scene graph.
  * !#zh 访问渲染场景树之前所触发的事件。
  * @event cc.Director.EVENT_BEFORE_VISIT
- * @param {Event} event
+ * @param {Event.EventCustom} event
+ */
+/**
+ * !#en The event which will be triggered before visiting the rendering scene graph.
+ * !#zh 访问渲染场景树之前所触发的事件。
+ * @property {String} EVENT_BEFORE_VISIT
+ * @readonly
+ * @static
  */
 cc.Director.EVENT_BEFORE_VISIT = "director_before_visit";
 
@@ -1305,9 +1375,20 @@ cc.Director.EVENT_BEFORE_VISIT = "director_before_visit";
  * !#en
  * The event which will be triggered after visiting the rendering scene graph,
  * the render queue is ready but not rendered at this point.
- * !#zh 访问渲染场景图之后所触发的事件，渲染队列已准备就绪，但在这一时刻还没有呈现在画布上。
+ * !#zh
+ * 访问渲染场景图之后所触发的事件，渲染队列已准备就绪，但在这一时刻还没有呈现在画布上。
  * @event cc.Director.EVENT_AFTER_VISIT
- * @param {Event} event
+ * @param {Event.EventCustom} event
+ */
+/**
+ * !#en
+ * The event which will be triggered after visiting the rendering scene graph,
+ * the render queue is ready but not rendered at this point.
+ * !#zh
+ * 访问渲染场景图之后所触发的事件，渲染队列已准备就绪，但在这一时刻还没有呈现在画布上。
+ * @property {String} EVENT_AFTER_VISIT
+ * @readonly
+ * @static
  */
 cc.Director.EVENT_AFTER_VISIT = "director_after_visit";
 
@@ -1315,13 +1396,21 @@ cc.Director.EVENT_AFTER_VISIT = "director_after_visit";
  * !#en The event which will be triggered after the rendering process.
  * !#zh 渲染过程之后所触发的事件。
  * @event cc.Director.EVENT_AFTER_DRAW
- * @param {Event} event
+ * @param {Event.EventCustom} event
+ */
+/**
+ * !#en The event which will be triggered after the rendering process.
+ * !#zh 渲染过程之后所触发的事件。
+ * @property {String} EVENT_AFTER_DRAW
+ * @readonly
+ * @static
  */
 cc.Director.EVENT_AFTER_DRAW = "director_after_draw";
 
 /***************************************************
  * implementation of DisplayLinkDirector
  **************************************************/
+
 cc.DisplayLinkDirector = cc.Director.extend(/** @lends cc.Director# */{
     invalid: false,
 
@@ -1339,13 +1428,16 @@ cc.DisplayLinkDirector = cc.Director.extend(/** @lends cc.Director# */{
     mainLoop: CC_EDITOR ? function (deltaTime, updateAnimate) {
         if (!this._paused) {
             this.emit(cc.Director.EVENT_BEFORE_UPDATE);
-            this.emit(cc.Director.EVENT_COMPONENT_UPDATE, deltaTime);
+
+            this._compScheduler.startPhase();
+            this._compScheduler.updatePhase(deltaTime);
 
             if (updateAnimate) {
                 this._scheduler.update(deltaTime);
             }
 
-            this.emit(cc.Director.EVENT_COMPONENT_LATE_UPDATE, deltaTime);
+            this._compScheduler.lateUpdatePhase(deltaTime);
+
             this.emit(cc.Director.EVENT_AFTER_UPDATE);
         }
 
@@ -1373,14 +1465,15 @@ cc.DisplayLinkDirector = cc.Director.extend(/** @lends cc.Director# */{
             this.calculateDeltaTime();
 
             if (!this._paused) {
-                // Call start for new added components
                 this.emit(cc.Director.EVENT_BEFORE_UPDATE);
+                // Call start for new added components
+                this._compScheduler.startPhase();
                 // Update for components
-                this.emit(cc.Director.EVENT_COMPONENT_UPDATE, this._deltaTime);
+                this._compScheduler.updatePhase(this._deltaTime);
                 // Engine update with scheduler
                 this._scheduler.update(this._deltaTime);
                 // Late update for components
-                this.emit(cc.Director.EVENT_COMPONENT_LATE_UPDATE, this._deltaTime);
+                this._compScheduler.lateUpdatePhase(this._deltaTime);
                 // User can use this event to do things after update
                 this.emit(cc.Director.EVENT_AFTER_UPDATE);
                 // Destroy entities that have been removed recently
@@ -1406,9 +1499,7 @@ cc.DisplayLinkDirector = cc.Director.extend(/** @lends cc.Director# */{
             this._totalFrames++;
 
             this.emit(cc.Director.EVENT_AFTER_DRAW);
-            cc.eventManager.frameUpdateListeners();
-
-            this._calculateMPF();
+            eventManager.frameUpdateListeners();
         }
     },
 
@@ -1430,7 +1521,24 @@ cc.DisplayLinkDirector = cc.Director.extend(/** @lends cc.Director# */{
             this.stopAnimation();
             this.startAnimation();
         }
-    }
+    },
+
+    __fastOn: function (type, callback, target) {
+        var listeners = this._bubblingListeners;
+        if (!listeners) {
+            listeners = this._bubblingListeners = new EventListeners();
+        }
+        listeners.add(type, callback, target);
+        this._addEventFlag(type, listeners, false);
+    },
+
+    __fastOff: function (type, callback, target) {
+        var listeners = this._bubblingListeners;
+        if (listeners) {
+            listeners.remove(type, callback, target);
+            this._purgeEventFlag(type, listeners, false);
+        }
+    },
 });
 
 cc.Director.sharedDirector = null;
@@ -1452,30 +1560,39 @@ cc.Director._getInstance = function () {
 cc.defaultFPS = 60;
 
 //Possible OpenGL projections used by director
+
 /**
  * Constant for 2D projection (orthogonal projection)
- * @constant
- * @type {Number}
+ * @property {Number} PROJECTION_2D
+ * @default 0
+ * @readonly
+ * @static
  */
 cc.Director.PROJECTION_2D = 0;
 
 /**
  * Constant for 3D projection with a fovy=60, znear=0.5f and zfar=1500.
- * @constant
- * @type {Number}
+ * @property {Number} PROJECTION_3D
+ * @default 1
+ * @readonly
+ * @static
  */
 cc.Director.PROJECTION_3D = 1;
 
 /**
  * Constant for custom projection, if cc.Director's projection set to it, it calls "updateProjection" on the projection delegate.
- * @constant
- * @type {Number}
+ * @property {Number} PROJECTION_CUSTOM
+ * @default 3
+ * @readonly
+ * @static
  */
 cc.Director.PROJECTION_CUSTOM = 3;
 
 /**
- * Constant for default projection of cc.Director, default projection is 3D projection
- * @constant
- * @type {Number}
+ * Constant for default projection of cc.Director, default projection is 2D projection
+ * @property {Number} PROJECTION_DEFAULT
+ * @default cc.Director.PROJECTION_2D
+ * @readonly
+ * @static
  */
 cc.Director.PROJECTION_DEFAULT = cc.Director.PROJECTION_2D;
